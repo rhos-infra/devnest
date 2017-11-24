@@ -78,7 +78,7 @@ class NodeReservation(object):
         """
         return self.reserve_str
 
-    def _get_reservation_endtime_epoch(self):
+    def get_reservation_endtime_epoch(self):
         """Return EPOCH time when reservation expires.
 
         Returns:
