@@ -114,14 +114,15 @@ class Node(object):
     Args:
         jenkins_instance(:obj:`Jenkins`): Jenkins instance
         node_name (:obj:`str`): Node name
+        jenkins_instance(:obj:`Jenkins.nodes._data['computer']`): Node
     """
-    def __init__(self, jenkins_instance, node_name):
+    def __init__(self, jenkins_instance, node_name, nodes_data):
         self.node_name = node_name
         self.node_data = None
 
         self.jenkins = jenkins_instance
 
-        for node_dt in self.jenkins.nodes._data['computer']:
+        for node_dt in nodes_data:
             if node_dt.get(NodeData.DISPLAY_NAME) == node_name:
                 self.node_data = node_dt
                 break

@@ -78,8 +78,10 @@ class JenkinsInstance(object):
         else:
             filtered_nodes = nodes.keys()
 
+        nodes_data = nodes._data['computer']
+
         for node in filtered_nodes:
-            cur_node = Node(self.jenkins, node)
+            cur_node = Node(self.jenkins, node, nodes_data)
             self.jenkins_nodes.append(cur_node)
 
         return self.jenkins_nodes
