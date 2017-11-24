@@ -118,6 +118,7 @@ class JenkinsNodeShell(object):
             if not parser_args.node:
                 raise CommandError("You need to specify CLI argument.")
 
+        LOG.info("Connecting to Jenkins...")
         jenkins_obj = JenkinsInstance(parser_args.url, parser_args.user,
                                       parser_args.password,
                                       parser_args.conf)
