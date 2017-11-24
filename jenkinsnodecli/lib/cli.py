@@ -114,6 +114,10 @@ class JenkinsNodeShell(object):
                 raise CommandError("--list command must not be, mixed with "
                                    "--reserve or --clear-reservation")
 
+        if not parser_args.list_nodes and not '-l' in argv:
+            if not parser_args.node:
+                raise CommandError("You need to specify CLI argument.")
+
         jenkins_obj = JenkinsInstance(parser_args.url, parser_args.user,
                                       parser_args.password,
                                       parser_args.conf)
