@@ -41,22 +41,22 @@ jenkinsnodecli --help
 
 ## Sample commands
 
-To list based on regexp
+To list based on regexp in a "shared" pool of servers
 ```
-jenkinsnodecli --conf config.ini -l *my_node_0?
-```
-
-To list all
-```
-jenkinsnodecli --conf config.ini -l
+jenkinsnodecli --conf config.ini list -g shared "*my_node_0?"
 ```
 
-To reserve node for 4h (regex must match only 1 node)
+To list all i a "shared" pool of servers
 ```
-jenkinsnodecli --conf config.ini -r 4 *my_node_03
+jenkinsnodecli --conf config.ini list -g shared
 ```
 
-To clear reservation
+To reserve node from "shared" pool for 4h (regex must match only 1 node)
 ```
-jenkinsnodecli --conf config.ini -c *my_node_03
+jenkinsnodecli --conf config.ini reserve -g shared -t 4 *my_node_03
+```
+
+To release reservation
+```
+jenkinsnodecli --conf config.ini release *my_node_03
 ```

@@ -22,6 +22,7 @@ from requests.exceptions import ConnectionError
 from jenkinsnodecli.lib.exceptions import CommandError
 from jenkinsnodecli.lib.exceptions import NodeCliException
 from jenkinsnodecli.lib.exceptions import NodeReservationError
+from jenkinsnodecli.lib.node import NodeStatus
 
 import argparse
 import datetime
@@ -32,17 +33,24 @@ import sys
 LOG = logger.LOG
 
 
+class Action(object):
+    """Enumeration for the CLI Action."""
+    (LIST, RELEASE, RESERVE) = range(3)
+
+
 class JenkinsNodeShell(object):
 
     def get_base_parser(self):
+        formatter = argparse.ArgumentDefaultsHelpFormatter
         parser = argparse.ArgumentParser(prog='jenkinsnodecli',
                                          description='CLI to perform various '
                                          'tasks to Jenkins Node(s).',
+                                         formatter_class=formatter,
                                          add_help=False)
 
         parser.add_argument('-?', '-h', '--help',
                             action='help',
-                            help='show this help message and exit')
+                            help='Show this help message and exit')
 
         parser.add_argument('-v', '--verbose',
                             action='store_true',
@@ -68,21 +76,68 @@ class JenkinsNodeShell(object):
                                  'overrides the password specified in the '
                                  'configuration file.')
 
-        parser.add_argument('-l', '--list-nodes',
-                            action='store_true',
-                            help='List nodes based on NODE_REGEXP')
+        subparsers = parser.add_subparsers(title='node action subcommands',
+                                           help='possible actions')
 
-        parser.add_argument('-r', '--reserve',
-                            type=int,
-                            help='Reserve node for time period in HOURS')
+        # Node parser is used by multiple subparsers
+        node_parser = argparse.ArgumentParser(add_help=False)
+        node_parser.add_argument('node',
+                                 nargs='?',
+                                 metavar='"NODE_REGEXP"',
+                                 default=None,
+                                 help='Node regex to perform action on, '
+                                      'use quotes around')
 
-        parser.add_argument('-c', '--clear-reservation',
-                            action='store_true',
-                            help='Clear reservation')
+        # Nest name (nest is a group of hardware by nest name)
+        nest_parser = argparse.ArgumentParser(add_help=False)
+        nest_group = nest_parser.add_mutually_exclusive_group(required=True)
+        nest_group.add_argument('-g', '--group',
+                                default="'shared'",
+                                help='Node group from which list will happen')
+        # Hide this option from standard user, it's for all nests
+        nest_group.add_argument('-a', '--all',
+                                action='store_true',
+                                help=argparse.SUPPRESS)
 
-        parser.add_argument('node',
-                            nargs='?',
-                            metavar='NODE_REGEXP')
+        list_parser = subparsers.add_parser('list',
+                                            parents=[node_parser, nest_parser],
+                                            formatter_class=formatter,
+                                            help='list available node(s)')
+        list_parser.set_defaults(action=Action.LIST)
+
+        release_parser = subparsers.add_parser('release',
+                                               parents=[node_parser],
+                                               formatter_class=formatter,
+                                               help='release node(s)')
+        release_parser.set_defaults(action=Action.RELEASE)
+
+        reserve_parser = subparsers.add_parser('reserve',
+                                               parents=[node_parser,
+                                                        nest_parser],
+                                               formatter_class=formatter,
+                                               help='reserve node')
+        reserve_parser.set_defaults(action=Action.RESERVE)
+
+        # List
+        list_parser.add_argument('-p', '--parseable',
+                                 action='store_true',
+                                 help='Machine parseable output')
+
+        # Reserve
+        reserve_parser.add_argument('-t', '--time',
+                                    type=int,
+                                    default=3,
+                                    help='Time in hours for the box to be reserved')
+
+        # Release - force releases server reserved by different user
+        release_parser.add_argument('-f', '--force',
+                                    action='store_true',
+                                    help=argparse.SUPPRESS)
+
+        # Release - brings node online after reservation is released
+        release_parser.add_argument('-o', '--online',
+                                    action='store_true',
+                                    help=argparse.SUPPRESS)
 
         return parser
 
@@ -90,9 +145,18 @@ class JenkinsNodeShell(object):
         parser = self.get_base_parser()
         args = parser.parse_args(argv)
 
-        if args.verbose:
+        parseable_output = False
+        if "parseable" in args and args.parseable is True:
+            parseable_output = True
+
+        if args.verbose and not parseable_output:
             LOG.setLevel(level=logging.DEBUG)
             LOG.debug('Jenkins Node CLI running in debug mode')
+
+        if parseable_output:
+            # On machine parseable output disable info logging
+            # to not spoil the output
+            LOG.setLevel(level=logging.ERROR)
 
         if not args.conf and not (args.user and args.password and args.url):
             raise CommandError("You must provide either username, password"
@@ -102,8 +166,9 @@ class JenkinsNodeShell(object):
 
     def main(self, argv):
         parser_args = self.parse_args(argv)
+        LOG.debug("%s" % parser_args)
 
-        if parser_args.reserve and not parser_args.node:
+        '''if parser_args.reserve and not parser_args.node:
             raise CommandError("You must provide node name.")
 
         if parser_args.clear_reservation and not parser_args.node:
@@ -116,7 +181,7 @@ class JenkinsNodeShell(object):
 
         if not parser_args.list_nodes and '-l' not in argv:
             if not parser_args.node:
-                raise CommandError("You need to specify CLI argument.")
+                raise CommandError("You need to specify CLI argument.")'''
 
         LOG.info("Connecting to Jenkins...")
         jenkins_obj = JenkinsInstance(parser_args.url, parser_args.user,
@@ -124,14 +189,26 @@ class JenkinsNodeShell(object):
                                       parser_args.conf)
 
         # List nodes
-        if parser_args.list_nodes or '-l' in argv:
-            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node)
-            print(_get_node_table_str(jenkins_nodes))
+        if parser_args.action is Action.LIST:
+            group = parser_args.group
+            if parser_args.all:
+                group = None
 
-        # Reserve
-        if parser_args.reserve and parser_args.node:
-            reservation_time = parser_args.reserve
-            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node)
+            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
+                                                  group=group)
+            if not parser_args.parseable:
+                print(_get_node_table_str(jenkins_nodes))
+            else:
+                print(_get_node_parseable_str(jenkins_nodes))
+
+        # Reserve node
+        if parser_args.action is Action.RESERVE:
+            reservation_time = parser_args.time
+            group = parser_args.group
+            if parser_args.all:
+                group = None
+            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
+                                                  group=group)
             if len(jenkins_nodes) != 1:
                 err_msg = "Found %s nodes maching your reservation" \
                           % len(jenkins_nodes)
@@ -140,20 +217,39 @@ class JenkinsNodeShell(object):
                                + _get_node_table_str(jenkins_nodes)
                 raise CommandError(err_msg)
 
-            jenkins_nodes[0].reserve(reservation_time)
+            reserve_node = jenkins_nodes[0]
+            if reserve_node.get_node_status() != NodeStatus.ONLINE:
+                err_msg = "Node %s is not online and can not be reserved. " \
+                    % reserve_node.get_name()
+                err_msg += "Node status: %s. Try release the node." \
+                    % reserve_node.get_node_status_str()
+                raise CommandError(err_msg)
+
+            reserve_node.reserve(reservation_time)
 
         # Clear Reservation
-        if parser_args.clear_reservation and parser_args.node:
-            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node)
+        if parser_args.action is Action.RELEASE:
+            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
+                                                  group=None)
             if len(jenkins_nodes) != 1:
-                err_msg = "Found %s nodes maching your criteria" \
+                err_msg = "Found %s nodes maching your node pattern" \
                           % len(jenkins_nodes)
                 if len(jenkins_nodes) > 1:
                     err_msg += ". Please specify only one.\n" \
                                + _get_node_table_str(jenkins_nodes)
                 raise CommandError(err_msg)
 
-            jenkins_nodes[0].clear_reservation()
+            reserve_node = jenkins_nodes[0]
+
+            reserve_user = reserve_node.get_reservation_owner()
+            jenkins_user = jenkins_obj.get_jenkins_username()
+            if reserve_user != jenkins_user and not parser_args.force:
+                err_msg = "Node %s is reserved by %s and can not " \
+                          "be released unless used with --force flag." \
+                    % (reserve_node.get_name(), reserve_user)
+                raise CommandError(err_msg)
+
+            reserve_node.clear_reservation(bring_online=parser_args.online)
 
 
 def _get_node_table_str(jenkins_nodes):
@@ -170,6 +266,26 @@ def _get_node_table_str(jenkins_nodes):
     table_data.extend(node_list)
     ascii_table = AsciiTable(table_data).table
     return ascii_table
+
+
+def _get_node_parseable_str(jenkins_nodes):
+    """Creates ; separated node info.
+
+    Returns:
+        (:obj:`str`): Node info separated by ';'
+    """
+    node_str = ""
+    count = 1
+    for node in jenkins_nodes:
+        node_list = [node.get_name(), node.get_node_status_str(),
+                     node.get_total_physical_mem(), node.get_reservation_owner(),
+                     node.get_reservation_endtime()]
+        node_str += ";".join([str(item) for item in node_list])
+        if count < len(jenkins_nodes):
+            node_str += "\n"
+        count += 1
+
+    return node_str
 
 
 def main(args=None):

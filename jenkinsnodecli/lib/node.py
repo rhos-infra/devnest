@@ -16,9 +16,11 @@
 #    under the License.
 
 from datetime import timedelta
+from jenkinsapi.custom_exceptions import PostRequired
 from jenkinsnodecli.lib.exceptions import NodeDataError
 from jenkinsnodecli.lib.exceptions import NodeReservationError
 from jenkinsnodecli.lib import logger
+from six.moves.urllib.parse import quote as urlquote
 from xml.etree import ElementTree
 
 import json
@@ -26,11 +28,15 @@ import time
 
 LOG = logger.LOG
 
+# Tags used to get node data from node description
+START_TAG = '<#{'
+END_TAG = '}#>'
+
 
 class NodeStatus(object):
     """Enumeration for the Node status."""
     (UNKNOWN, ONLINE, OFFLINE, TEMPORARILY_OFFLINE,
-     RESERVED, RESERVED_TIMEOUT) = range(6)
+     RESERVED, REPROVISION) = range(6)
 
 
 class NodeData(object):
@@ -94,6 +100,12 @@ class NodeReservation(object):
         """
         return self.reservation_owner
 
+    def clear_reservation_endtime(self):
+        """Sets the reservation endtime to starttime
+        """
+        self.reserve_str = "TO_REPROVISION"
+        self.reservation_endtime = self.reservation_starttime
+
     def __str__(self):
         reservation = {'reservation': {
             'reservedUntil': self.reserve_str,
@@ -103,6 +115,27 @@ class NodeReservation(object):
         }}
 
         return json.dumps(reservation)
+
+
+class NodeDetails(object):
+    """Class to represent data stored in Jenkins master in the Node
+       Description section. We store that data in description place
+       because it's quickly available from the Jenkins API. More detailed
+       node data requires subsequent queries which are slow.
+
+    Args:
+        node_labels (:obj:`list`): Labels associated with the node
+    """
+    def __init__(self, node_labels):
+        self.node_labels = node_labels
+
+    def get_node_labels(self):
+        """Return node labels
+
+        Returns:
+            (:obj:`list`): Reservation end time in user friendly format.
+        """
+        return self.node_labels
 
 
 class Node(object):
@@ -132,7 +165,9 @@ class Node(object):
 
         self.total_physical_mem = self._set_total_physical_mem()
         self.reservation_info = self._get_reservation_info()
-        self.node_status = self._get_node_status()
+        self.node_status = self.get_node_status()
+        description = self.node_data.get('description')
+        self.node_details = self._node_details_from_description(description)
 
     def reserve(self, reservation_time):
         """Marks node as reserved for requested time.
@@ -181,20 +216,33 @@ class Node(object):
                  self.get_name(), reservation_time, owner))
         LOG.info('Node ip address: %s' % (ip_address))
 
-    def clear_reservation(self):
-        """Clears reservation for particular node and brings it online.
-        """
-        if self.node_status == NodeStatus.RESERVED or \
-           self.node_status == NodeStatus.RESERVED_TIMEOUT:
-            LOG.info('Clearing reservation for the: %s' % self.get_name())
-            jenkins_node = self.jenkins.get_node(self.get_name())
+    def clear_reservation(self, bring_online=False):
+        """Clears reservation for particular node and optionally
+        brings it online."""
+        if self.node_status not in (NodeStatus.RESERVED, NodeStatus.REPROVISION):
+            pass
+
+        jenkins_node = self.jenkins.get_node(self.get_name())
+        if bring_online and self.node_status != NodeStatus.ONLINE:
             jenkins_node.set_online()
             LOG.info('Node %s is no longer reserved' % self.get_name())
+        elif bring_online:
+            LOG.info('Node %s was already online' % self.get_name())
+        elif self.node_status == NodeStatus.RESERVED:
+            LOG.info('Marking %s to be reprovisioned' % self.get_name())
+            self.reservation_info.clear_reservation_endtime()
+            self._set_offline_cause(str(self.reservation_info))
+            LOG.info('Node %s is no longer reserved and will be '
+                     'reprovisioned' % self.get_name())
         else:
             LOG.info('Node %s is not reserved' % self.get_name())
 
     def get_reservation_endtime(self):
         if self.reservation_info:
+            reservation_endtime = self._get_reservation_endtime_epoch()
+            current_time = time.time()
+            if reservation_endtime and reservation_endtime <= current_time:
+                return "Outdated, reprovision pending..."
             return self.reservation_info.get_reservation_endtime()
         return ""
 
@@ -221,8 +269,8 @@ class Node(object):
         if self.node_status == NodeStatus.RESERVED:
             return "Reserved"
 
-        if self.node_status == NodeStatus.RESERVED_TIMEOUT:
-            return "Reserved*"
+        if self.node_status == NodeStatus.REPROVISION:
+            return "Reprovision"
 
         return "Unknown"
 
@@ -242,7 +290,28 @@ class Node(object):
         """
         return self.total_physical_mem
 
-    def _get_node_status(self):
+    def is_node_in_group(self, groups):
+        """Check if node belongs to one of the group passed. The check
+           happens by finding if group is within the node labels from
+           description.
+
+        Args:
+            inventory_file (:obj:`list`): groups to which node may belong
+
+        Returns:
+            (:obj:`bool`): True if node is in the group, False otherwise
+        """
+        if not self.node_details:
+            return False
+
+        node_groups = self.node_details.get_node_labels()
+        for group in groups:
+            if group in node_groups:
+                return True
+
+        return False
+
+    def get_node_status(self):
         """Returns status of the node object.
 
         Returns:
@@ -260,7 +329,7 @@ class Node(object):
             return NodeStatus.RESERVED
 
         if reservation_endtime and reservation_endtime <= current_time:
-            return NodeStatus.RESERVED_TIMEOUT
+            return NodeStatus.REPROVISION
 
         if offline:
             return NodeStatus.OFFLINE
@@ -269,6 +338,26 @@ class Node(object):
             return NodeStatus.TEMPORARILY_OFFLINE
 
         return NodeStatus.ONLINE
+
+    def _node_details_from_description(self, description):
+        """Parse description and return Node details.
+
+        Returns:
+            (:obj:`float`): EPOCH time when reservation expires.
+        """
+        node_labels = []
+
+        try:
+            details_start = description.index(START_TAG) + len(START_TAG) - 1
+            details_end = description.index(END_TAG, details_start) + 1
+            details_json = description[details_start:details_end]
+            json_data = json.loads(details_json)
+            node_labels = str(json_data.get('reservation').get('labels'))
+        except (ValueError, AttributeError):
+            LOG.debug('Could not read details data for '
+                      'node: %s' % self.get_name())
+
+        return NodeDetails(node_labels)
 
     def _get_reservation_endtime_epoch(self):
         """Return EPOCH time when reservation expires.
@@ -333,3 +422,19 @@ class Node(object):
                 return "%3.1f%s" % (memory_size, value)
             memory_size /= 1024.0
         return "%3.1f%s" % (memory_size, 'TB')
+
+    def _set_offline_cause(self, message):
+        """Set offline cause for the node. Jenkinsapi does not have this
+           functionality so we have to write one.
+
+        Args:
+            message (:obj:`string`): message to be used as offline reason
+        """
+        jenkins_node = self.jenkins.get_node(self.get_name())
+
+        url = jenkins_node.baseurl + \
+            "/changeOfflineCause?offlineMessage=" + urlquote(message)
+        try:
+            self.jenkins.requester.get_and_confirm_status(url)
+        except PostRequired:
+            self.jenkins.requester.post_and_confirm_status(url, data={})

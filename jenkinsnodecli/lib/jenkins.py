@@ -62,7 +62,7 @@ class JenkinsInstance(object):
 
         self.jenkins = self._get_jenkins_instance()
 
-    def get_nodes(self, node_regex=None):
+    def get_nodes(self, node_regex=None, group=None):
         """Return list of all nodes or subset based on regex.
 
         Args:
@@ -82,9 +82,21 @@ class JenkinsInstance(object):
 
         for node in filtered_nodes:
             cur_node = Node(self.jenkins, node, nodes_data)
-            self.jenkins_nodes.append(cur_node)
+            if group is None:
+                self.jenkins_nodes.append(cur_node)
+            else:
+                if cur_node.is_node_in_group([group]):
+                    self.jenkins_nodes.append(cur_node)
 
         return self.jenkins_nodes
+
+    def get_jenkins_username(self):
+        """Return jenkins username used to log in.
+
+        Returns:
+            (:obj:`str`): Jenkins username
+        """
+        return self.jenkins_username
 
     def _get_jenkins_instance(self):
         """Return jenkins object instance.
