@@ -529,12 +529,19 @@ class Node(object):
             description_regex = START_TAG + ".*?" + END_TAG
             description_str = re.sub(description_regex, '', description_str)
 
-        # Set json data for the description
-        self._set_config_data('description',
-                              "%s %s" % (description_str, node_details))
+        self._set_node_config()
+        config_str = self._config
 
-        self._set_config_data('label',
-                              ' '.join(node_details.get_node_labels()))
+        # Set json data for the description
+        config_str = \
+            self._set_config_data(config_str, 'description',
+                                  "%s %s" % (description_str, node_details))
+
+        config_str = \
+            self._set_config_data(config_str, 'label',
+                                  ' '.join(node_details.get_node_labels()))
+
+        self._upload_config_data(config_str)
 
     def _set_node_config(self):
         """Returns XML with node config
@@ -547,23 +554,31 @@ class Node(object):
             node.load_config()
         self._config = node._config
 
-    def _set_config_data(self, tag, data_str):
+    def _set_config_data(self, config_str, tag, data_str):
         """Set node config data
 
         Args:
+            config_str (:obj:`string`): string representing config
             tag (:obj:`string`): tag to which data_str will be set
             data_str (:obj:`string`): data_str to be set for node
+
+        Returns:
+            (:obj:`string`): Modified node config data string
         """
-        self._set_node_config()
-        slave_xml = ElementTree.fromstring(self._config)
+        slave_xml = ElementTree.fromstring(config_str)
 
         slave_xml.find(tag).text = data_str
 
         config_str = ElementTree.tostring(slave_xml)
+
+        LOG.debug('Node %s, config changed %s: %s' % (self.get_name(),
+                                                      tag, data_str))
+        return config_str
+
+    def _upload_config_data(self, config_str):
         node = self._get_node_instance()
         node.upload_config(config_str)
-        LOG.debug('Node %s, updated %s: %s' % (self.get_name(),
-                                               tag, data_str))
+        LOG.debug('Node %s, config uploaded' % self.get_name())
 
     def _get_config_data(self, tag):
         """Get node config data
