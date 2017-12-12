@@ -24,6 +24,7 @@ from six.moves.urllib.parse import quote as urlquote
 from xml.etree import ElementTree
 
 import json
+import re
 import time
 
 LOG = logger.LOG
@@ -137,6 +138,38 @@ class NodeDetails(object):
         """
         return self.node_labels
 
+    def add_node_labels(self, node_labels=[]):
+        """add node labels to already existing ones
+
+        Args:
+            node_labels(:obj:`list`): labels to be added
+        """
+        self.node_labels = list(set(self.node_labels + node_labels))
+
+    def remove_node_labels(self, node_labels=[]):
+        """remove node labels if they exists
+
+        Args:
+            node_labels(:obj:`list`): labels to be removed
+        """
+        self.node_labels = [label for label in self.node_labels
+                            if label not in node_labels]
+
+    def remove_all_node_labels(self):
+        """remove all node labels
+        """
+        self.node_labels = []
+
+    def __str__(self):
+        json_str = START_TAG
+
+        reservation = {'reservation': {
+            'labels': self.node_labels
+        }}
+        json_str += json.dumps(reservation)
+        json_str += END_TAG
+        return json_str
+
 
 class Node(object):
     """Representation of the Jenkins node.
@@ -154,6 +187,7 @@ class Node(object):
         self.node_data = None
 
         self.jenkins = jenkins_instance
+        self.node = None
 
         for node_dt in nodes_data:
             if node_dt.get(NodeData.DISPLAY_NAME) == node_name:
@@ -168,6 +202,7 @@ class Node(object):
         self.node_status = self.get_node_status()
         description = self.node_data.get('description')
         self.node_details = self._node_details_from_description(description)
+        self._config = None
 
     def reserve(self, reservation_time):
         """Marks node as reserved for requested time.
@@ -222,9 +257,9 @@ class Node(object):
         if self.node_status not in (NodeStatus.RESERVED, NodeStatus.REPROVISION):
             pass
 
-        jenkins_node = self.jenkins.get_node(self.get_name())
         if bring_online and self.node_status != NodeStatus.ONLINE:
-            jenkins_node.set_online()
+            node = self._get_node_instance()
+            node.set_online()
             LOG.info('Node %s is no longer reserved' % self.get_name())
         elif bring_online:
             LOG.info('Node %s was already online' % self.get_name())
@@ -348,11 +383,11 @@ class Node(object):
         node_labels = []
 
         try:
-            details_start = description.index(START_TAG) + len(START_TAG) - 1
-            details_end = description.index(END_TAG, details_start) + 1
+            details_start = description.index(START_TAG) + len(START_TAG)
+            details_end = description.index(END_TAG, details_start)
             details_json = description[details_start:details_end]
             json_data = json.loads(details_json)
-            node_labels = str(json_data.get('reservation').get('labels'))
+            node_labels = json_data.get('reservation').get('labels')
         except (ValueError, AttributeError):
             LOG.debug('Could not read details data for '
                       'node: %s' % self.get_name())
@@ -423,6 +458,126 @@ class Node(object):
             memory_size /= 1024.0
         return "%3.1f%s" % (memory_size, 'TB')
 
+    def clear_all_groups(self):
+        """Clears all the groups from node
+        """
+        LOG.info('Removing groups from node: %s' % self.get_name())
+        description_str = self._get_config_data('description')
+        node_details = self._node_details_from_description(description_str)
+        node_details.remove_all_node_labels()
+
+        self._update_node_with_node_details(node_details)
+        LOG.info('Groups removed from node: %s' % self.get_name())
+
+    def update_with_groups(self, groups=[]):
+        """Update node with the provided gruops. This removes any other
+        groups from the node.
+
+        Args:
+            groups(:obj:`list`): groups to be associated with the node
+        """
+        LOG.info('Updating groups "%s" for node: %s' % (",".join(groups),
+                                                        self.get_name()))
+        description_str = self._get_config_data('description')
+        node_details = self._node_details_from_description(description_str)
+        node_details.remove_all_node_labels()
+        node_details.add_node_labels(groups)
+
+        self._update_node_with_node_details(node_details)
+        LOG.info('Updated, node %s is in groups: %s' % (self.get_name(),
+                 ",".join(node_details.get_node_labels())))
+
+    def add_groups(self, groups=[]):
+        """Add node to groups.
+
+        Args:
+            groups(:obj:`list`): groups to be added
+        """
+        LOG.info('Adding groups "%s" to node: %s' % (",".join(groups),
+                                                     self.get_name()))
+        description_str = self._get_config_data('description')
+        node_details = self._node_details_from_description(description_str)
+        node_details.add_node_labels(groups)
+
+        self._update_node_with_node_details(node_details)
+        LOG.info('Added, node %s is in groups: %s' % (self.get_name(),
+                 ",".join(node_details.get_node_labels())))
+
+    def remove_groups(self, groups=[]):
+        """Remove groups from node if they exists.
+
+        Args:
+            groups(:obj:`list`): groups to be removed
+        """
+        description_str = self._get_config_data('description')
+        node_details = self._node_details_from_description(description_str)
+        node_details.remove_node_labels(groups)
+
+        self._update_node_with_node_details(node_details)
+
+    def _update_node_with_node_details(self, node_details):
+        """Update node with NodeDetails data.
+
+        Args:
+            node_details(:obj:`NodeDetails`): update node with NodeDetails
+        """
+        description_str = self._get_config_data('description')
+        LOG.debug('Node %s, description: %s' % (self.get_name(),
+                                                description_str))
+        # Remove extra metadata from the description
+        if START_TAG in description_str and END_TAG in description_str:
+            description_regex = START_TAG + ".*?" + END_TAG
+            description_str = re.sub(description_regex, '', description_str)
+
+        # Set json data for the description
+        self._set_config_data('description',
+                              "%s %s" % (description_str, node_details))
+
+        self._set_config_data('label',
+                              ' '.join(node_details.get_node_labels()))
+
+    def _set_node_config(self):
+        """Returns XML with node config
+
+        Returns:
+            (:obj:`string`): XML with node config
+        """
+        node = self._get_node_instance()
+        if self._config is None:
+            node.load_config()
+        self._config = node._config
+
+    def _set_config_data(self, tag, data_str):
+        """Set node config data
+
+        Args:
+            tag (:obj:`string`): tag to which data_str will be set
+            data_str (:obj:`string`): data_str to be set for node
+        """
+        self._set_node_config()
+        slave_xml = ElementTree.fromstring(self._config)
+
+        slave_xml.find(tag).text = data_str
+
+        config_str = ElementTree.tostring(slave_xml)
+        node = self._get_node_instance()
+        node.upload_config(config_str)
+        LOG.debug('Node %s, updated %s: %s' % (self.get_name(),
+                                               tag, data_str))
+
+    def _get_config_data(self, tag):
+        """Get node config data
+
+        Args:
+            tag (:obj:`string`): tag from which data will be returned
+
+        Returns:
+            (:obj:`string`): data from the tag
+        """
+        self._set_node_config()
+        slave_xml = ElementTree.fromstring(self._config)
+        return slave_xml.find(tag).text
+
     def _set_offline_cause(self, message):
         """Set offline cause for the node. Jenkinsapi does not have this
            functionality so we have to write one.
@@ -430,11 +585,24 @@ class Node(object):
         Args:
             message (:obj:`string`): message to be used as offline reason
         """
-        jenkins_node = self.jenkins.get_node(self.get_name())
-
-        url = jenkins_node.baseurl + \
+        node = self._get_node_instance()
+        url = node.baseurl + \
             "/changeOfflineCause?offlineMessage=" + urlquote(message)
         try:
             self.jenkins.requester.get_and_confirm_status(url)
         except PostRequired:
             self.jenkins.requester.post_and_confirm_status(url, data={})
+
+    def _get_node_instance(self):
+        """Returns instance of the Jenkins Node Class
+
+        Returns:
+            (:obj:`jenkinsapi.Node`): instance of the Jenkins Node class
+        """
+        node = None
+        if self.node is None:
+            node = self.jenkins.get_node(self.node_name)
+            self.node = node
+        else:
+            node = self.node
+        return node

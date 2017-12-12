@@ -35,7 +35,7 @@ LOG = logger.LOG
 
 class Action(object):
     """Enumeration for the CLI Action."""
-    (LIST, RELEASE, RESERVE) = range(3)
+    (LIST, RELEASE, RESERVE, MANAGE) = range(4)
 
 
 class JenkinsNodeShell(object):
@@ -139,6 +139,37 @@ class JenkinsNodeShell(object):
                                     action='store_true',
                                     help=argparse.SUPPRESS)
 
+        # Group parser
+        group_parser = argparse.ArgumentParser(add_help=False)
+        manage_group = group_parser.add_mutually_exclusive_group(required=True)
+
+        manage_group.add_argument('-l', '--list',
+                                  action='store_true',
+                                  help="list all groups")
+        manage_group.add_argument('-g', '--get',
+                                  action='store_true',
+                                  help="get groups for node")
+        manage_group.add_argument('-u', '--update',
+                                  help="update node with comma separated "
+                                       "group(s)")
+        manage_group.add_argument('-a', '--add',
+                                  help="add comma separated group(s) "
+                                       "to node if not already")
+        manage_group.add_argument('-r', '--remove',
+                                  help="remove comma separated group(s) "
+                                       "from node if they exists")
+        manage_group.add_argument('-c', '--clear',
+                                  action='store_true',
+                                  help="clear all groups from node")
+        # Manage section
+        manage_parser = subparsers.add_parser('manage-groups',
+                                              parents=[node_parser,
+                                                       group_parser],
+                                              formatter_class=formatter,
+                                              help='manage node groups, use '
+                                                   'with caution')
+        manage_parser.set_defaults(action=Action.MANAGE)
+
         return parser
 
     def parse_args(self, argv):
@@ -167,21 +198,6 @@ class JenkinsNodeShell(object):
     def main(self, argv):
         parser_args = self.parse_args(argv)
         LOG.debug("%s" % parser_args)
-
-        '''if parser_args.reserve and not parser_args.node:
-            raise CommandError("You must provide node name.")
-
-        if parser_args.clear_reservation and not parser_args.node:
-            raise CommandError("You must provide node name.")
-
-        if parser_args.list_nodes or '-l' in argv:
-            if parser_args.reserve or parser_args.clear_reservation:
-                raise CommandError("--list command must not be, mixed with "
-                                   "--reserve or --clear-reservation")
-
-        if not parser_args.list_nodes and '-l' not in argv:
-            if not parser_args.node:
-                raise CommandError("You need to specify CLI argument.")'''
 
         LOG.info("Connecting to Jenkins...")
         jenkins_obj = JenkinsInstance(parser_args.url, parser_args.user,
@@ -251,6 +267,44 @@ class JenkinsNodeShell(object):
 
             reserve_node.clear_reservation(bring_online=parser_args.online)
 
+        # Group manage
+        if parser_args.action is Action.MANAGE:
+            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
+                                                  group=None)
+            # group-manage -l
+            if parser_args.list:
+                all_groups = []
+                for node in jenkins_nodes:
+                    all_groups += node.node_details.get_node_labels()
+                print("Available groups: " + ",".join(list(set(all_groups))))
+
+            # group-manage -g
+            elif parser_args.get:
+                print(_get_node_groups_table_str(jenkins_nodes))
+
+            else:
+                if len(jenkins_nodes) != 1:
+                    err_msg = "Found %s nodes maching your node pattern" \
+                              % len(jenkins_nodes)
+                    if len(jenkins_nodes) > 1:
+                        err_msg += ". Please specify only one.\n" \
+                                   + _get_node_table_str(jenkins_nodes)
+                    raise CommandError(err_msg)
+
+                node = jenkins_nodes[0]
+
+                if parser_args.clear:
+                    node.clear_all_groups()
+                elif parser_args.update:
+                    groups = parser_args.update.split(",")
+                    node.update_with_groups(groups)
+                elif parser_args.add:
+                    groups = parser_args.add.split(",")
+                    node.add_groups(groups)
+                elif parser_args.remove:
+                    groups = parser_args.remove.split(",")
+                    node.remove_groups(groups)
+
 
 def _get_node_table_str(jenkins_nodes):
     """Creates nicely formatted table with node info.
@@ -263,6 +317,22 @@ def _get_node_table_str(jenkins_nodes):
     node_list = [[i.get_name(), i.get_node_status_str(),
                   i.get_total_physical_mem(), i.get_reservation_owner(),
                   i.get_reservation_endtime()] for i in jenkins_nodes]
+    table_data.extend(node_list)
+    ascii_table = AsciiTable(table_data).table
+    return ascii_table
+
+
+def _get_node_groups_table_str(jenkins_nodes):
+    """Creates nicely formatted table with node info.
+
+    Returns:
+        (:obj:`str`): Table with node info ready to be printed
+    """
+    table_data = [["Slave name", "Status",
+                   "Physical Memory", "Reserved by", "Groups"]]
+    node_list = [[i.get_name(), i.get_node_status_str(),
+                  i.get_total_physical_mem(), i.get_reservation_owner(),
+                  ",".join([str(item) for item in i.node_details.get_node_labels()])] for i in jenkins_nodes]
     table_data.extend(node_list)
     ascii_table = AsciiTable(table_data).table
     return ascii_table
