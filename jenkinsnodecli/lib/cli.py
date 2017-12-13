@@ -317,8 +317,8 @@ def _get_node_table_str(jenkins_nodes):
     Returns:
         (:obj:`str`): Table with node info ready to be printed
     """
-    table_data = [["Slave name", "Status",
-                   "Physical Memory", "Reserved by", "Reserved until"]]
+    table_data = [["Host", "State",
+                   "RAM", "Reserved by", "Reserved until"]]
     node_list = [[i.get_name(), i.get_node_status_str(),
                   i.get_total_physical_mem(), i.get_reservation_owner(),
                   i.get_reservation_endtime()] for i in jenkins_nodes]
@@ -333,8 +333,8 @@ def _get_node_groups_table_str(jenkins_nodes):
     Returns:
         (:obj:`str`): Table with node info ready to be printed
     """
-    table_data = [["Slave name", "Status",
-                   "Physical Memory", "Reserved by", "Groups"]]
+    table_data = [["Host", "State",
+                   "RAM", "Reserved by", "Groups"]]
     node_list = [[i.get_name(), i.get_node_status_str(),
                   i.get_total_physical_mem(), i.get_reservation_owner(),
                   ",".join([str(item) for item in i.node_details.get_node_labels()])] for i in jenkins_nodes]
