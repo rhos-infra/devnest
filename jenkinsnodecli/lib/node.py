@@ -295,19 +295,19 @@ class Node(object):
             (:obj:`NodeStatus`): node status
         """
         if self.node_status == NodeStatus.OFFLINE:
-            return "Offline"
+            return "disabled"
 
         if self.node_status == NodeStatus.TEMPORARILY_OFFLINE:
-            return "Temporarily offline"
+            return "temporarily offline"
 
         if self.node_status == NodeStatus.ONLINE:
-            return "Online"
+            return "free"
 
         if self.node_status == NodeStatus.RESERVED:
-            return "Reserved"
+            return "reserved"
 
         if self.node_status == NodeStatus.REPROVISION:
-            return "Reprovision"
+            return "pending"
 
         return "Unknown"
 
@@ -443,7 +443,7 @@ class Node(object):
             inventory_file (:obj:`int`): memory in bytes
 
         Returns:
-            (:obj:`str`): memory with suffix
+            (:obj:`str`): memory with suffix or empty string if 0
         """
         memory_size = 0
 
@@ -453,6 +453,9 @@ class Node(object):
             memory_size = swap_space_dt.get(NodeData.TOTAL_PHYSICAL_MEMORY)
         except Exception:
             pass
+
+        if memory_size == 0:
+            return ""
 
         for value in ['bytes', 'KB', 'MB', 'GB']:
             if memory_size < 1024.0:
