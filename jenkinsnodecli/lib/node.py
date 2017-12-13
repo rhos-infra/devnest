@@ -204,7 +204,7 @@ class Node(object):
         self.node_details = self._node_details_from_description(description)
         self._config = None
 
-    def reserve(self, reservation_time):
+    def reserve(self, reservation_time, owner=None):
         """Marks node as reserved for requested time.
         Reserved node is put temporarily offline, is it can finish currently
         running task and metadata is stored in the offline reason section
@@ -216,6 +216,7 @@ class Node(object):
 
         Args:
             reservation_time (:obj:`int`): Requested reservation time in Hours
+            owner (:obj:`int`): Override automatically discovered username
         """
         LOG.info('Attempting to reserve node: %s for %s Hours' % (
                  self.get_name(), reservation_time))
@@ -229,7 +230,8 @@ class Node(object):
                                        "can't be reserved. Use -l option to "
                                        "get more info." % self.get_name())
 
-        owner = self.jenkins.requester.username
+        if not owner:
+            owner = self.jenkins.requester.username
         start_time = time.time()
         offset_time = timedelta(hours=reservation_time).total_seconds()
         end_time = start_time + offset_time

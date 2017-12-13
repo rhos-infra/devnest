@@ -129,6 +129,10 @@ class JenkinsNodeShell(object):
                                     default=3,
                                     help='Time in hours for the box to be reserved')
 
+        # Owner that reserved node.
+        reserve_parser.add_argument('-o', '--owner',
+                                    help=argparse.SUPPRESS)
+
         # Release - force releases server reserved by different user
         release_parser.add_argument('-f', '--force',
                                     action='store_true',
@@ -241,7 +245,8 @@ class JenkinsNodeShell(object):
                     % reserve_node.get_node_status_str()
                 raise CommandError(err_msg)
 
-            reserve_node.reserve(reservation_time)
+            reservation_owner = parser_args.owner
+            reserve_node.reserve(reservation_time, owner=reservation_owner)
 
         # Clear Reservation
         if parser_args.action is Action.RELEASE:
