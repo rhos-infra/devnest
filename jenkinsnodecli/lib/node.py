@@ -126,17 +126,50 @@ class NodeDetails(object):
 
     Args:
         node_labels (:obj:`list`): Labels associated with the node
+        physical_ram (:obj:`str`): Physical RAM memory
+        capabilities(:obj:`str`): Capabilities to be set in JSON str
     """
-    def __init__(self, node_labels):
+    def __init__(self, node_labels, physical_ram=None, capabilities=None):
         self.node_labels = node_labels
+        self.physical_ram = physical_ram
+        self.capabilities = capabilities
 
     def get_node_labels(self):
         """Return node labels
 
         Returns:
-            (:obj:`list`): Reservation end time in user friendly format.
+            (:obj:`list`): Labels associated with the node.
         """
         return self.node_labels
+
+    def get_node_labels_from_capabilities(self):
+        """Return node labels calculated from capabilities
+
+        Format:
+            cap_CAPABILITYNAME_VALUE
+
+            Example:
+              cap_vcpus_4
+              cap_ram_190GB
+
+        Returns:
+            (:obj:`list`): Labels from capabilities.
+        """
+        cap_labels = []
+
+        for value in self.capabilities.keys():
+            cap_labels.append("cap_%s_%s" % (value,
+                              self.capabilities.get(value)))
+
+        return cap_labels
+
+    def get_physical_ram(self):
+        """Return physical ram
+
+        Returns:
+            (:obj:`str`): Physical RAM memory.
+        """
+        return self.physical_ram
 
     def add_node_labels(self, node_labels=[]):
         """add node labels to already existing ones
@@ -160,13 +193,35 @@ class NodeDetails(object):
         """
         self.node_labels = []
 
+    def get_capabilities(self):
+        """Return node capabilities
+
+        Returns:
+            (:obj:`str`): JSON str with node capabilities or empty string
+        """
+
+        return self.capabilities or ""
+
+    def set_capabilities(self, capabilities):
+        """Set node capabilities
+
+        Args:
+            capabilities(:obj:`str`): Capabilities to be set in JSON str
+        """
+
+        self.capabilities = capabilities
+
     def __str__(self):
         json_str = START_TAG
 
-        reservation = {'reservation': {
-            'labels': self.node_labels
-        }}
-        json_str += json.dumps(reservation)
+        node_details = {
+            'reservation': {
+                'labels': self.node_labels
+            }
+        }
+        if self.get_capabilities() or len(self.get_capabilities() > 0):
+            node_details.update({'capabilities': self.get_capabilities()})
+        json_str += json.dumps(node_details)
         json_str += END_TAG
         return json_str
 
@@ -197,7 +252,6 @@ class Node(object):
         if not self.node_data:
             raise NodeDataError("Failed to get data for node %s" % node_name)
 
-        self.total_physical_mem = self._set_total_physical_mem()
         self.reservation_info = self._get_reservation_info()
         self.node_status = self.get_node_status()
         description = self.node_data.get('description')
@@ -319,14 +373,6 @@ class Node(object):
         """
         return self.node_name
 
-    def get_total_physical_mem(self):
-        """Return total physical memory - human readable string with suffix.
-
-        Returns:
-            (:obj:`str`): memory with suffix
-        """
-        return self.total_physical_mem
-
     def is_node_in_group(self, groups):
         """Check if node belongs to one of the group passed. The check
            happens by finding if group is within the node labels from
@@ -376,6 +422,22 @@ class Node(object):
 
         return NodeStatus.ONLINE
 
+    def update_capabilities(self, capabilities):
+        """Update node capabilities
+
+        Args:
+            capabilities (:obj:`str`): json string representing capabilities
+        """
+        try:
+            capabilities = capabilities.replace("'", '"')
+            json_data = json.loads(capabilities)
+            node_details = self.node_details
+            node_details.set_capabilities(json_data)
+            self._update_node_with_node_details(node_details)
+        except ValueError:
+            raise NodeDataError("Improper json format for capabilities:"
+                                " '%s'" % capabilities)
+
     def _node_details_from_description(self, description):
         """Parse description and return Node details.
 
@@ -383,6 +445,7 @@ class Node(object):
             (:obj:`float`): EPOCH time when reservation expires.
         """
         node_labels = []
+        capabilities = None
 
         try:
             details_start = description.index(START_TAG) + len(START_TAG)
@@ -390,11 +453,14 @@ class Node(object):
             details_json = description[details_start:details_end]
             json_data = json.loads(details_json)
             node_labels = json_data.get('reservation').get('labels')
+            capabilities = json_data.get('capabilities')
         except (ValueError, AttributeError):
             LOG.debug('Could not read details data for '
                       'node: %s' % self.get_name())
 
-        return NodeDetails(node_labels)
+        physical_ram = self._get_total_physical_mem()
+
+        return NodeDetails(node_labels, physical_ram, capabilities)
 
     def _get_reservation_endtime_epoch(self):
         """Return EPOCH time when reservation expires.
@@ -436,8 +502,8 @@ class Node(object):
 
         return reservation_info
 
-    def _set_total_physical_mem(self):
-        """Set total physical memory - human readable string with suffix.
+    def _get_total_physical_mem(self):
+        """Get total physical memory - human readable string with suffix.
 
         Args:
             inventory_file (:obj:`int`): memory in bytes
@@ -542,9 +608,12 @@ class Node(object):
             self._set_config_data(config_str, 'description',
                                   "%s %s" % (description_str, node_details))
 
+        node_labels = list(set(node_details.get_node_labels() +
+                           node_details.get_node_labels_from_capabilities()))
+
         config_str = \
             self._set_config_data(config_str, 'label',
-                                  ' '.join(node_details.get_node_labels()))
+                                  ' '.join(node_labels))
 
         self._upload_config_data(config_str)
 

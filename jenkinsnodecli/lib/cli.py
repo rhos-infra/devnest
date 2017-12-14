@@ -35,7 +35,7 @@ LOG = logger.LOG
 
 class Action(object):
     """Enumeration for the CLI Action."""
-    (LIST, RELEASE, RESERVE, MANAGE) = range(4)
+    (LIST, RELEASE, RESERVE, MANAGE, CAPABILITIES) = range(5)
 
 
 class JenkinsNodeShell(object):
@@ -174,6 +174,23 @@ class JenkinsNodeShell(object):
                                                    'with caution')
         manage_parser.set_defaults(action=Action.MANAGE)
 
+        # Capabilities parser
+        capabilities_parser = argparse.ArgumentParser(add_help=False)
+        capabilities_group = \
+            capabilities_parser.add_mutually_exclusive_group(required=True)
+        capabilities_group.add_argument('-l', '--list',
+                                        action='store_true',
+                                        help="list capabilities")
+        capabilities_group.add_argument('-u', '--update',
+                                        help="update node(s) capabilities"
+                                             "passed as json dictionary")
+
+        capabilities = subparsers.add_parser('capabilities',
+                                             parents=[node_parser,
+                                                      capabilities_parser],
+                                             formatter_class=formatter,
+                                             help='manage node capabilities')
+        capabilities.set_defaults(action=Action.CAPABILITIES)
         return parser
 
     def parse_args(self, argv):
@@ -310,6 +327,33 @@ class JenkinsNodeShell(object):
                     groups = parser_args.remove.split(",")
                     node.remove_groups(groups)
 
+        # Capabilities
+        if parser_args.action is Action.CAPABILITIES:
+            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
+                                                  group=None)
+            # capabilities -l
+            if parser_args.list:
+                print(_get_capabilities_str(jenkins_nodes))
+
+            # capabilities -u
+            if parser_args.update:
+                for node in jenkins_nodes:
+                    node.update_capabilities(parser_args.update)
+
+
+def _get_capabilities_str(jenkins_nodes):
+    """Creates nicely formatted table with capabilities info.
+
+    Returns:
+        (:obj:`str`): Table with capabilities info ready to be printed
+    """
+    table_data = [["Host", "State", "Capabilities"]]
+    node_list = [[i.get_name(), i.get_node_status_str(),
+                  i.node_details.get_capabilities()] for i in jenkins_nodes]
+    table_data.extend(node_list)
+    ascii_table = AsciiTable(table_data).table
+    return ascii_table
+
 
 def _get_node_table_str(jenkins_nodes):
     """Creates nicely formatted table with node info.
@@ -320,7 +364,7 @@ def _get_node_table_str(jenkins_nodes):
     table_data = [["Host", "State",
                    "RAM", "Reserved by", "Reserved until"]]
     node_list = [[i.get_name(), i.get_node_status_str(),
-                  i.get_total_physical_mem(), i.get_reservation_owner(),
+                  i.node_details.get_physical_ram(), i.get_reservation_owner(),
                   i.get_reservation_endtime()] for i in jenkins_nodes]
     table_data.extend(node_list)
     ascii_table = AsciiTable(table_data).table
@@ -336,7 +380,7 @@ def _get_node_groups_table_str(jenkins_nodes):
     table_data = [["Host", "State",
                    "RAM", "Reserved by", "Groups"]]
     node_list = [[i.get_name(), i.get_node_status_str(),
-                  i.get_total_physical_mem(), i.get_reservation_owner(),
+                  i.node_details.get_physical_ram(), i.get_reservation_owner(),
                   ",".join([str(item) for item in i.node_details.get_node_labels()])] for i in jenkins_nodes]
     table_data.extend(node_list)
     ascii_table = AsciiTable(table_data).table
@@ -353,7 +397,8 @@ def _get_node_parseable_str(jenkins_nodes):
     count = 1
     for node in jenkins_nodes:
         node_list = [node.get_name(), node.get_node_status_str(),
-                     node.get_total_physical_mem(), node.get_reservation_owner(),
+                     node.node_details.get_physical_ram(),
+                     node.get_reservation_owner(),
                      node.get_reservation_endtime()]
         node_str += ";".join([str(item) for item in node_list])
         if count < len(jenkins_nodes):
