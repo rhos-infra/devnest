@@ -129,7 +129,7 @@ class NodeDetails(object):
         physical_ram (:obj:`str`): Physical RAM memory
         capabilities(:obj:`str`): Capabilities to be set in JSON str
     """
-    def __init__(self, node_labels, physical_ram=None, capabilities=None):
+    def __init__(self, node_labels, physical_ram=None, capabilities={}):
         self.node_labels = node_labels
         self.physical_ram = physical_ram
         self.capabilities = capabilities
@@ -156,10 +156,9 @@ class NodeDetails(object):
             (:obj:`list`): Labels from capabilities.
         """
         cap_labels = []
-
-        for value in self.capabilities.keys():
+        for value in self.get_capabilities().keys():
             cap_labels.append("cap_%s_%s" % (value,
-                              self.capabilities.get(value)))
+                              self.get_capabilities().get(value)))
 
         return cap_labels
 
@@ -193,14 +192,30 @@ class NodeDetails(object):
         """
         self.node_labels = []
 
+    def get_capability(self, capability_name):
+        """Return node capabilities
+
+        Args:
+            capability_name(:obj:`str`): capability name
+
+        Returns:
+            (:obj:`str`): string representation of capability value or ""
+        """
+
+        capability_value = self.get_capabilities().get(capability_name)
+
+        return capability_value or ""
+
     def get_capabilities(self):
         """Return node capabilities
 
         Returns:
-            (:obj:`str`): JSON str with node capabilities or empty string
+            (:obj:`str`): JSON str with node capabilities or empty dictionary
         """
+        if not isinstance(self.capabilities, dict):
+            self.capabilities = {}
 
-        return self.capabilities or ""
+        return self.capabilities
 
     def set_capabilities(self, capabilities):
         """Set node capabilities
@@ -219,7 +234,7 @@ class NodeDetails(object):
                 'labels': self.node_labels
             }
         }
-        if self.get_capabilities() or len(self.get_capabilities() > 0):
+        if (len(self.get_capabilities()) > 0):
             node_details.update({'capabilities': self.get_capabilities()})
         json_str += json.dumps(node_details)
         json_str += END_TAG
@@ -608,8 +623,9 @@ class Node(object):
             self._set_config_data(config_str, 'description',
                                   "%s %s" % (description_str, node_details))
 
-        node_labels = list(set(node_details.get_node_labels() +
-                           node_details.get_node_labels_from_capabilities()))
+        node_labels = node_details.get_node_labels()
+        node_labels_cap = node_details.get_node_labels_from_capabilities()
+        node_labels = list(set(node_labels + node_labels_cap))
 
         config_str = \
             self._set_config_data(config_str, 'label',

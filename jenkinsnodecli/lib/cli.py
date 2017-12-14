@@ -362,9 +362,12 @@ def _get_node_table_str(jenkins_nodes):
         (:obj:`str`): Table with node info ready to be printed
     """
     table_data = [["Host", "State",
-                   "RAM", "Reserved by", "Reserved until"]]
-    node_list = [[i.get_name(), i.get_node_status_str(),
-                  i.node_details.get_physical_ram(), i.get_reservation_owner(),
+                   "RAM", "vCPU", "Reserved by", "Reserved until"]]
+    node_list = [[i.get_name(),
+                  i.get_node_status_str(),
+                  i.node_details.get_physical_ram(),
+                  i.node_details.get_capability('vcpu'),
+                  i.get_reservation_owner(),
                   i.get_reservation_endtime()] for i in jenkins_nodes]
     table_data.extend(node_list)
     ascii_table = AsciiTable(table_data).table
@@ -398,6 +401,7 @@ def _get_node_parseable_str(jenkins_nodes):
     for node in jenkins_nodes:
         node_list = [node.get_name(), node.get_node_status_str(),
                      node.node_details.get_physical_ram(),
+                     node.node_details.get_capability('vcpu'),
                      node.get_reservation_owner(),
                      node.get_reservation_endtime()]
         node_str += ";".join([str(item) for item in node_list])
