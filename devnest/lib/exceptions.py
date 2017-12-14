@@ -15,7 +15,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from jenkinsnodecli.lib import logger
+from devnest.lib import logger
 
 LOG = logger.LOG
 

@@ -34,7 +34,7 @@ logger_formatter = colorlog.ColoredFormatter(
     )
 )
 
-LOGGER_NAME = "JenkinsNodeCliLogger"
+LOGGER_NAME = "devnestLogger"
 DEFAULT_LOG_LEVEL = logging.INFO
 
 LOG = logging.getLogger(LOGGER_NAME)
@@ -51,12 +51,12 @@ sh.setFormatter(logger_formatter)
 LOG.addHandler(sh)
 
 
-def jenkinsnodecli_excepthook(exc_type, exc_value, exc_traceback):
+def devnest_excepthook(exc_type, exc_value, exc_traceback):
     """exception hook that sends NodeCliException to log and other
 
     exceptions to stderr (default excepthook)
     """
-    from jenkinsnodecli.lib.exceptions import NodeCliException
+    from devnest.lib.exceptions import NodeCliException
 
     # sends full exception with trace to log
     if not isinstance(exc_value, NodeCliException):
@@ -70,4 +70,4 @@ def jenkinsnodecli_excepthook(exc_type, exc_value, exc_traceback):
         LOG.error(exc_value.message)
 
 
-sys.excepthook = jenkinsnodecli_excepthook
+sys.excepthook = devnest_excepthook

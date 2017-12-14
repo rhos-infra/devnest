@@ -15,8 +15,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from jenkinsnodecli.lib.release import __AUTHOR__
-from jenkinsnodecli.lib.release import __VERSION__
+from devnest.lib.release import __AUTHOR__
+from devnest.lib.release import __VERSION__
 from pip import req
 from setuptools import find_packages
 from setuptools import setup
@@ -28,7 +28,7 @@ import platform
 install_reqs = req.parse_requirements('requirements.txt', session=False)
 
 # reqs is a list of requirement from requirements.txt
-reqs = [str(jenkinsnodecli.req) for jenkinsnodecli in install_reqs]
+reqs = [str(devnest.req) for devnest in install_reqs]
 
 with open("LICENSE") as file:
     license = file.read()
@@ -36,7 +36,7 @@ with open("README.md") as file:
     long_description = file.read()
 
 setup(
-    name='jenkinsnodecli',
+    name='devnest',
     version=__VERSION__,
     author=__AUTHOR__,
     author_email='rhos-ci@redhat.com',
@@ -46,7 +46,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     entry_points={
-        'console_scripts': ['jenkinsnodecli = jenkinsnodecli.lib.cli:main']
+        'console_scripts': ['devnest = devnest.lib.cli:main']
     }
 )
 

@@ -19,9 +19,9 @@ import ConfigParser
 import requests
 import fnmatch
 
-from jenkinsnodecli.lib import exceptions
-from jenkinsnodecli.lib import logger
-from jenkinsnodecli.lib.node import Node
+from devnest.lib import exceptions
+from devnest.lib import logger
+from devnest.lib.node import Node
 from jenkinsapi.jenkins import Jenkins
 from jenkinsapi.utils.requester import Requester
 requests.packages.urllib3.disable_warnings()

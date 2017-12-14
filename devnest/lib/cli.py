@@ -15,14 +15,14 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from jenkinsnodecli.lib import logger
+from devnest.lib import logger
 
-from jenkinsnodecli.lib.jenkins import JenkinsInstance
+from devnest.lib.jenkins import JenkinsInstance
 from requests.exceptions import ConnectionError
-from jenkinsnodecli.lib.exceptions import CommandError
-from jenkinsnodecli.lib.exceptions import NodeCliException
-from jenkinsnodecli.lib.exceptions import NodeReservationError
-from jenkinsnodecli.lib.node import NodeStatus
+from devnest.lib.exceptions import CommandError
+from devnest.lib.exceptions import NodeCliException
+from devnest.lib.exceptions import NodeReservationError
+from devnest.lib.node import NodeStatus
 
 import argparse
 import datetime
@@ -42,9 +42,9 @@ class JenkinsNodeShell(object):
 
     def get_base_parser(self):
         formatter = argparse.ArgumentDefaultsHelpFormatter
-        parser = argparse.ArgumentParser(prog='jenkinsnodecli',
-                                         description='CLI to perform various '
-                                         'tasks to Jenkins Node(s).',
+        parser = argparse.ArgumentParser(prog='devnest',
+                                         description='CLI to reserve, release'
+                                         ' or manage hardware in DevNest.',
                                          formatter_class=formatter,
                                          add_help=False)
 
@@ -203,7 +203,7 @@ class JenkinsNodeShell(object):
 
         if args.verbose and not parseable_output:
             LOG.setLevel(level=logging.DEBUG)
-            LOG.debug('Jenkins Node CLI running in debug mode')
+            LOG.debug('devnest running in debug mode')
 
         if parseable_output:
             # On machine parseable output disable info logging
@@ -415,7 +415,7 @@ def _get_node_parseable_str(jenkins_nodes):
 def main(args=None):
     start_time = datetime.datetime.now()
 
-    LOG.debug('Started jenkinsnodecli: %s' %
+    LOG.debug('Started devnest: %s' %
               start_time.strftime('%Y-%m-%d %H:%M:%S'))
 
     try:
@@ -439,7 +439,7 @@ def main(args=None):
         sys.exit(130)
     finally:
         finish_time = datetime.datetime.now()
-        LOG.debug('Finished jenkinsnodecli: %s' %
+        LOG.debug('Finished devnest: %s' %
                   finish_time.strftime('%Y-%m-%d %H:%M:%S'))
         LOG.debug('Run time: %s [H]:[M]:[S].[ms]' %
                   str(finish_time - start_time))

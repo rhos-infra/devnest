@@ -17,9 +17,9 @@
 
 from datetime import timedelta
 from jenkinsapi.custom_exceptions import PostRequired
-from jenkinsnodecli.lib.exceptions import NodeDataError
-from jenkinsnodecli.lib.exceptions import NodeReservationError
-from jenkinsnodecli.lib import logger
+from devnest.lib.exceptions import NodeDataError
+from devnest.lib.exceptions import NodeReservationError
+from devnest.lib import logger
 from six.moves.urllib.parse import quote as urlquote
 from xml.etree import ElementTree
 
