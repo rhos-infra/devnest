@@ -320,7 +320,18 @@ class Node(object):
 
         LOG.info('Node: %s reserved for %s Hours by %s' % (
                  self.get_name(), reservation_time, owner))
-        LOG.info('Node ip address: %s' % (ip_address))
+
+        username = self.node_details.get_capability('username')
+        password = self.node_details.get_capability('password')
+
+        if username and len(username) > 0 and password and len(password) > 0:
+            LOG.info('Node access: $ sshpass -p %s '
+                     'ssh %s@%s' % (password, username, ip_address))
+        else:
+            LOG.info('Node ssh: %s' % (ip_address))
+
+        LOG.info('Cancel reservation with "devnest release'
+                 ' %s"' % (self.get_name()))
 
     def clear_reservation(self, bring_online=False):
         """Clears reservation for particular node and optionally
