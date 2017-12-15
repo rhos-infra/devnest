@@ -29,8 +29,14 @@ import datetime
 import logging
 from terminaltables import AsciiTable
 import sys
+import os
 
 LOG = logger.LOG
+
+DEFAULT_CONFIG = [
+    os.path.expanduser("~") + "/.config/jenkins_jobs/jenkins_jobs.ini",
+    "/etc/jenkins_jobs/jenkins_jobs.ini"
+]
 
 
 class Action(object):
@@ -193,6 +199,20 @@ class JenkinsNodeShell(object):
         capabilities.set_defaults(action=Action.CAPABILITIES)
         return parser
 
+    def _get_default_config(self):
+        """Return path to the default jenkins config if exists
+
+        Returns:
+            (:obj:`str`): config path
+        """
+        config_path = None
+        for path in DEFAULT_CONFIG:
+            if os.path.isfile(path) and os.access(path, os.R_OK):
+                config_path = path
+                break
+
+        return config_path
+
     def parse_args(self, argv):
         parser = self.get_base_parser()
         args = parser.parse_args(argv)
@@ -211,9 +231,13 @@ class JenkinsNodeShell(object):
             LOG.setLevel(level=logging.ERROR)
 
         if not args.conf and not (args.user and args.password and args.url):
-            raise CommandError("You must provide either username, password"
-                               " and url or path to configuration file"
-                               " via --conf option.")
+            if self._get_default_config():
+                args.conf = self._get_default_config()
+            else:
+                raise CommandError("You must provide either username, password"
+                                   " and url or path to configuration file"
+                                   " via --conf option.")
+
         return args
 
     def main(self, argv):

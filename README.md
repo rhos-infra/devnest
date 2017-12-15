@@ -15,6 +15,9 @@ user is able to use it, until reservation expires and it's being cleaned.
 
 ## Config File
 
+By default, devnest looks for ~/.config/jenkins_jobs/jenkins_jobs.ini,
+or /etc/jenkins_jobs/jenkins_jobs.ini (in that order).
+
 It is possible to replace CLI arguments such as user, password and url
 with config file containing this information and pass path to this file
 using --conf flag.:
