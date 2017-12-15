@@ -2,8 +2,11 @@
 
 A simple CLI to manage "reservations" for the hardware in devnest.
 
-The primary use case for this tool is to reserve Jenkins node
+The primary use case for this tool is to reserve shared node
 for debugging and development work.
+
+Current implementation uses Jenkins APIs and metadata stored inside
+Jenkins to manage lifecycle of hardware in the DevNest.
 
 Once the node is reserved it's being put offline, so no other Jenkins
 user is able to use it, until reservation expires and it's being cleaned.
@@ -26,7 +29,7 @@ url=https://JENKINS_URL
 JENKINS_API_TOKEN can be found using Jenkins at:
     https://JENKINS_URL/user/JENKINS_USERNAME/configure
 
-## Run Jenkins Node CLI
+## Run DevNest CLI
 
 Running in virtual environment:
 
