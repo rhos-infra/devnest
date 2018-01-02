@@ -38,6 +38,8 @@ DEFAULT_CONFIG = [
     "/etc/jenkins_jobs/jenkins_jobs.ini"
 ]
 
+LIST_FORMATS = ['csv', 'table']
+
 
 class Action(object):
     """Enumeration for the CLI Action."""
@@ -125,9 +127,9 @@ class JenkinsNodeShell(object):
         reserve_parser.set_defaults(action=Action.RESERVE)
 
         # List
-        list_parser.add_argument('-p', '--parseable',
-                                 action='store_true',
-                                 help='Machine parseable output')
+        list_parser.add_argument('-f', '--format',
+                                 default='table',
+                                 help='Parseable output, options: csv,table')
 
         # Reserve
         reserve_parser.add_argument('-t', '--time',
@@ -257,10 +259,15 @@ class JenkinsNodeShell(object):
 
             jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
                                                   group=group)
-            if not parser_args.parseable:
+
+            if parser_args.format is None or parser_args.format == 'table':
                 print(_get_node_table_str(jenkins_nodes))
-            else:
+            elif parser_args.format in LIST_FORMATS:
                 print(_get_node_parseable_str(jenkins_nodes))
+            else:
+                err_msg = "List format '%s' is not supported." \
+                          % parser_args.format
+                raise CommandError(err_msg)
 
         # Reserve node
         if parser_args.action is Action.RESERVE:
@@ -386,11 +393,11 @@ def _get_node_table_str(jenkins_nodes):
         (:obj:`str`): Table with node info ready to be printed
     """
     table_data = [["Host", "State",
-                   "RAM", "vCPU", "Reserved by", "Reserved until"]]
+                   "RAM", "CPU", "Reserved by", "Reserved until"]]
     node_list = [[i.get_name(),
                   i.get_node_status_str(),
                   i.node_details.get_physical_ram(),
-                  i.node_details.get_capability('vcpu'),
+                  i.node_details.get_capability('cpu'),
                   i.get_reservation_owner(),
                   i.get_reservation_endtime()] for i in jenkins_nodes]
     table_data.extend(node_list)
@@ -425,7 +432,7 @@ def _get_node_parseable_str(jenkins_nodes):
     for node in jenkins_nodes:
         node_list = [node.get_name(), node.get_node_status_str(),
                      node.node_details.get_physical_ram(),
-                     node.node_details.get_capability('vcpu'),
+                     node.node_details.get_capability('cpu'),
                      node.get_reservation_owner(),
                      node.get_reservation_endtime()]
         node_str += ";".join([str(item) for item in node_list])

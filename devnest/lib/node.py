@@ -149,7 +149,7 @@ class NodeDetails(object):
             cap_CAPABILITYNAME_VALUE
 
             Example:
-              cap_vcpus_4
+              cap_cpus_4
               cap_ram_190GB
 
         Returns:
