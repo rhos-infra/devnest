@@ -1,2 +1,3 @@
 pip>=9.0.1 # keep it first to avoid some bugs
 flake8
+wheel
