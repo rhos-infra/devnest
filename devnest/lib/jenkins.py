@@ -67,6 +67,9 @@ class JenkinsInstance(object):
 
         Args:
             tester (:obj:`str`): string value of the regex
+
+        Returns:
+            (:Node:`list`): Jenkins nodes
         """
 
         nodes = self.jenkins.nodes

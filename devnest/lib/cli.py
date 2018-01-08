@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2017 Red Hat, Inc.
+# Copyright 2017, 2018 Red Hat, Inc.
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -43,18 +43,96 @@ LIST_FORMATS = ['csv', 'table']
 
 class Action(object):
     """Enumeration for the CLI Action."""
-    (LIST, RELEASE, RESERVE, MANAGE, CAPABILITIES) = range(5)
+    (LIST, RELEASE, RESERVE, GROUP, CAPABILITIES) = range(5)
+
+
+class Columns(object):
+    """Enumeration for the columns."""
+    (HOST, STATE, RAM, CPU, RESERVED, UNTIL, GROUPS,
+     CAPABILITIES) = range(8)
+
+    DEFAULT = 'host,state,ram,cpu,reserved,until'
+
+    @staticmethod
+    def get_columns(columns_string):
+        columns = []
+        for column in columns_string.split(','):
+            if column.upper() in Columns.__dict__:
+                columns.append(Columns.__dict__.get(column.upper()))
+            else:
+                raise CommandError("Unknown column: %s" % column)
+
+        return columns
+
+    @staticmethod
+    def to_str(column):
+        return {
+            Columns.HOST: 'Host',
+            Columns.STATE: 'State',
+            Columns.RAM: 'RAM',
+            Columns.CPU: 'CPU',
+            Columns.RESERVED: 'Reserved by',
+            Columns.UNTIL: 'Reserved until',
+            Columns.GROUPS: 'Groups',
+            Columns.CAPABILITIES: 'Capabilities',
+        }[column]
+
+    @staticmethod
+    def to_data(node, column):
+        return {
+            Columns.HOST: node.get_name(),
+            Columns.STATE: node.get_node_status_str(),
+            Columns.RAM: node.node_details.get_physical_ram(),
+            Columns.CPU: node.node_details.get_capability('cpu'),
+            Columns.RESERVED: node.get_reservation_owner(),
+            Columns.UNTIL: node.get_reservation_endtime(),
+            Columns.GROUPS: node.node_details.get_node_labels(),
+            Columns.CAPABILITIES: node.node_details.get_capabilities(),
+        }[column]
 
 
 class JenkinsNodeShell(object):
 
     def get_base_parser(self):
         formatter = argparse.ArgumentDefaultsHelpFormatter
+
+        # Config parser
+        config_parser = argparse.ArgumentParser(add_help=False)
+
+        config_group = config_parser.add_argument_group()
+
+        config_group.add_argument('--conf',
+                                  help='Configuration file. [jenkins] section '
+                                       'is the same as in '
+                                       'jenkins-job-builder.')
+
+        config_group.add_argument('--url',
+                                  help='The Jenkins URL to use.'
+                                       'This overrides the url specified in '
+                                       'the configuration file')
+
+        config_group.add_argument('-u', '--user',
+                                  help='The Jenkins user to use for '
+                                       'authentication. This overrides the '
+                                       'user specified in the configuration '
+                                       'file')
+
+        config_group.add_argument('-p', '--password',
+                                  help='Password or API token to use for '
+                                       'authenticating towards Jenkins. '
+                                       'This overrides the password specified '
+                                       'in the configuration file.')
+
+        # Main parser
         parser = argparse.ArgumentParser(prog='devnest',
+                                         parents=[config_group],
                                          description='CLI to reserve, release'
                                          ' or manage hardware in DevNest.',
                                          formatter_class=formatter,
                                          add_help=False)
+
+        subparsers = parser.add_subparsers(title='node action subcommands',
+                                           help='possible actions')
 
         parser.add_argument('-?', '-h', '--help',
                             action='help',
@@ -64,32 +142,9 @@ class JenkinsNodeShell(object):
                             action='store_true',
                             help='increase output verbosity')
 
-        parser.add_argument('--conf',
-                            help='Configuration file. [jenkins] section '
-                                 'is the same as in jenkins-job-builder.')
-
-        parser.add_argument('--url',
-                            help='The Jenkins URL to use.'
-                                 'This overrides the url specified in the '
-                                 'configuration file')
-
-        parser.add_argument('-u', '--user',
-                            help='The Jenkins user to use for authentication.'
-                                  'This overrides the user specified in the '
-                                  'configuration file')
-
-        parser.add_argument('-p', '--password',
-                            help='Password or API token to use for '
-                                 'authenticating towards Jenkins. This '
-                                 'overrides the password specified in the '
-                                 'configuration file.')
-
-        subparsers = parser.add_subparsers(title='node action subcommands',
-                                           help='possible actions')
-
         # Node parser is used by multiple subparsers
         node_parser = argparse.ArgumentParser(add_help=False)
-        node_parser.add_argument('node',
+        node_parser.add_argument('node_regex',
                                  nargs='?',
                                  metavar='"NODE_REGEXP"',
                                  default=None,
@@ -131,6 +186,10 @@ class JenkinsNodeShell(object):
                                  default='table',
                                  help='Parseable output, options: csv,table')
 
+        list_parser.add_argument('-c', '--column',
+                                 default=Columns.DEFAULT,
+                                 help='Columns to show')
+
         # Reserve
         reserve_parser.add_argument('-t', '--time',
                                     type=int,
@@ -152,53 +211,48 @@ class JenkinsNodeShell(object):
                                     help=argparse.SUPPRESS)
 
         # Group parser
-        group_parser = argparse.ArgumentParser(add_help=False)
-        manage_group = group_parser.add_mutually_exclusive_group(required=True)
+        groups_parser = argparse.ArgumentParser(add_help=False)
+        manage_group = groups_parser.add_mutually_exclusive_group(required=True)
 
-        manage_group.add_argument('-l', '--list',
-                                  action='store_true',
-                                  help="list all groups")
-        manage_group.add_argument('-g', '--get',
-                                  action='store_true',
-                                  help="get groups for node")
-        manage_group.add_argument('-u', '--update',
-                                  help="update node with comma separated "
-                                       "group(s)")
         manage_group.add_argument('-a', '--add',
                                   help="add comma separated group(s) "
                                        "to node if not already")
-        manage_group.add_argument('-r', '--remove',
-                                  help="remove comma separated group(s) "
-                                       "from node if they exists")
         manage_group.add_argument('-c', '--clear',
                                   action='store_true',
                                   help="clear all groups from node")
+        manage_group.add_argument('-g', '--get',
+                                  action='store_true',
+                                  help="get groups, without regex "
+                                       "get all groups in devnest")
+        manage_group.add_argument('-r', '--remove',
+                                  help="remove comma separated group(s) "
+                                       "from node if they exists")
+        manage_group.add_argument('-s', '--set',
+                                  help="set node with comma separated "
+                                       "group(s)")
         # Manage section
-        manage_parser = subparsers.add_parser('manage-groups',
+        manage_parser = subparsers.add_parser('group',
                                               parents=[node_parser,
-                                                       group_parser],
+                                                       groups_parser],
                                               formatter_class=formatter,
-                                              help='manage node groups, use '
+                                              help='manage devnest groups, use '
                                                    'with caution')
-        manage_parser.set_defaults(action=Action.MANAGE)
+        manage_parser.set_defaults(action=Action.GROUP)
 
-        # Capabilities parser
-        capabilities_parser = argparse.ArgumentParser(add_help=False)
-        capabilities_group = \
-            capabilities_parser.add_mutually_exclusive_group(required=True)
-        capabilities_group.add_argument('-l', '--list',
-                                        action='store_true',
-                                        help="list capabilities")
-        capabilities_group.add_argument('-u', '--update',
-                                        help="update node(s) capabilities"
-                                             "passed as json dictionary")
+        # Capability parser
+        capability_parser = argparse.ArgumentParser(add_help=False)
+        capability_group = \
+            capability_parser.add_mutually_exclusive_group(required=True)
+        capability_group.add_argument('-s', '--set',
+                                      help="update node(s) capabilities"
+                                           "passed as json dictionary")
 
-        capabilities = subparsers.add_parser('capabilities',
-                                             parents=[node_parser,
-                                                      capabilities_parser],
-                                             formatter_class=formatter,
-                                             help='manage node capabilities')
-        capabilities.set_defaults(action=Action.CAPABILITIES)
+        capability = subparsers.add_parser('capability',
+                                           parents=[node_parser,
+                                                    capability_parser],
+                                           formatter_class=formatter,
+                                           help='manage node capabilities')
+        capability.set_defaults(action=Action.CAPABILITIES)
         return parser
 
     def _get_default_config(self):
@@ -248,8 +302,7 @@ class JenkinsNodeShell(object):
 
         LOG.info("Connecting to Jenkins...")
         jenkins_obj = JenkinsInstance(parser_args.url, parser_args.user,
-                                      parser_args.password,
-                                      parser_args.conf)
+                                      parser_args.password, parser_args.conf)
 
         # List nodes
         if parser_args.action is Action.LIST:
@@ -257,13 +310,13 @@ class JenkinsNodeShell(object):
             if parser_args.all:
                 group = None
 
-            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
-                                                  group=group)
+            jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group)
 
             if parser_args.format is None or parser_args.format == 'table':
-                print(_get_node_table_str(jenkins_nodes))
+                print(_get_node_table_str(jenkins_nodes, parser_args.column))
             elif parser_args.format in LIST_FORMATS:
-                print(_get_node_parseable_str(jenkins_nodes))
+                print(_get_node_parseable_str(jenkins_nodes,
+                                              parser_args.column))
             else:
                 err_msg = "List format '%s' is not supported." \
                           % parser_args.format
@@ -275,8 +328,8 @@ class JenkinsNodeShell(object):
             group = parser_args.group
             if parser_args.all:
                 group = None
-            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
-                                                  group=group)
+            jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group)
+
             if len(jenkins_nodes) != 1:
                 err_msg = "Found %s nodes maching your reservation" \
                           % len(jenkins_nodes)
@@ -298,8 +351,8 @@ class JenkinsNodeShell(object):
 
         # Clear Reservation
         if parser_args.action is Action.RELEASE:
-            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
-                                                  group=None)
+            jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group=None)
+
             if len(jenkins_nodes) != 1:
                 err_msg = "Found %s nodes maching your node pattern" \
                           % len(jenkins_nodes)
@@ -321,20 +374,15 @@ class JenkinsNodeShell(object):
             reserve_node.clear_reservation(bring_online=parser_args.online)
 
         # Group manage
-        if parser_args.action is Action.MANAGE:
-            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
-                                                  group=None)
-            # group-manage -l
-            if parser_args.list:
+        if parser_args.action is Action.GROUP:
+            jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group=None)
+
+            # group -g
+            if parser_args.get:
                 all_groups = []
                 for node in jenkins_nodes:
                     all_groups += node.node_details.get_node_labels()
                 print("Available groups: " + ",".join(list(set(all_groups))))
-
-            # group-manage -g
-            elif parser_args.get:
-                print(_get_node_groups_table_str(jenkins_nodes))
-
             else:
                 if len(jenkins_nodes) != 1:
                     err_msg = "Found %s nodes maching your node pattern" \
@@ -348,8 +396,8 @@ class JenkinsNodeShell(object):
 
                 if parser_args.clear:
                     node.clear_all_groups()
-                elif parser_args.update:
-                    groups = parser_args.update.split(",")
+                elif parser_args.set:
+                    groups = parser_args.set.split(",")
                     node.update_with_groups(groups)
                 elif parser_args.add:
                     groups = parser_args.add.split(",")
@@ -360,86 +408,53 @@ class JenkinsNodeShell(object):
 
         # Capabilities
         if parser_args.action is Action.CAPABILITIES:
-            jenkins_nodes = jenkins_obj.get_nodes(node_regex=parser_args.node,
-                                                  group=None)
-            # capabilities -l
-            if parser_args.list:
-                print(_get_capabilities_str(jenkins_nodes))
+            jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group=None)
 
-            # capabilities -u
-            if parser_args.update:
+            # capabilities -s
+            if parser_args.set:
                 for node in jenkins_nodes:
-                    node.update_capabilities(parser_args.update)
+                    node.update_capabilities(parser_args.set)
 
 
-def _get_capabilities_str(jenkins_nodes):
-    """Creates nicely formatted table with capabilities info.
-
-    Returns:
-        (:obj:`str`): Table with capabilities info ready to be printed
-    """
-    table_data = [["Host", "State", "Capabilities"]]
-    node_list = [[i.get_name(), i.get_node_status_str(),
-                  i.node_details.get_capabilities()] for i in jenkins_nodes]
-    table_data.extend(node_list)
-    ascii_table = AsciiTable(table_data).table
-    return ascii_table
-
-
-def _get_node_table_str(jenkins_nodes):
+def _get_node_table_str(jenkins_nodes, columns=Columns.DEFAULT):
     """Creates nicely formatted table with node info.
+
+    Args:
+        columns (:obj:`string`): comma separated list of columns
 
     Returns:
         (:obj:`str`): Table with node info ready to be printed
     """
-    table_data = [["Host", "State",
-                   "RAM", "CPU", "Reserved by", "Reserved until"]]
-    node_list = [[i.get_name(),
-                  i.get_node_status_str(),
-                  i.node_details.get_physical_ram(),
-                  i.node_details.get_capability('cpu'),
-                  i.get_reservation_owner(),
-                  i.get_reservation_endtime()] for i in jenkins_nodes]
+    columns_list = Columns.get_columns(columns)
+    table_data = [[Columns.to_str(x) for x in columns_list]]
+
+    node_list = [[Columns.to_data(jenkins_node, column)
+                  for column in columns_list]
+                 for jenkins_node in jenkins_nodes]
     table_data.extend(node_list)
+
     ascii_table = AsciiTable(table_data).table
     return ascii_table
 
 
-def _get_node_groups_table_str(jenkins_nodes):
-    """Creates nicely formatted table with node info.
-
-    Returns:
-        (:obj:`str`): Table with node info ready to be printed
-    """
-    table_data = [["Host", "State",
-                   "RAM", "Reserved by", "Groups"]]
-    node_list = [[i.get_name(), i.get_node_status_str(),
-                  i.node_details.get_physical_ram(), i.get_reservation_owner(),
-                  ",".join([str(item) for item in i.node_details.get_node_labels()])] for i in jenkins_nodes]
-    table_data.extend(node_list)
-    ascii_table = AsciiTable(table_data).table
-    return ascii_table
-
-
-def _get_node_parseable_str(jenkins_nodes):
+def _get_node_parseable_str(jenkins_nodes, columns=Columns.DEFAULT):
     """Creates ; separated node info.
+
+    Args:
+        columns (:obj:`string`): comma separated list of columns
 
     Returns:
         (:obj:`str`): Node info separated by ';'
     """
     node_str = ""
     count = 1
-    for node in jenkins_nodes:
-        node_list = [node.get_name(), node.get_node_status_str(),
-                     node.node_details.get_physical_ram(),
-                     node.node_details.get_capability('cpu'),
-                     node.get_reservation_owner(),
-                     node.get_reservation_endtime()]
-        node_str += ";".join([str(item) for item in node_list])
+    columns_list = Columns.get_columns(columns)
+    for jenkins_node in jenkins_nodes:
+        node_str += ";".join([str(Columns.to_data(jenkins_node, column))
+                             for column in columns_list])
         if count < len(jenkins_nodes):
             node_str += "\n"
         count += 1
-
     return node_str
 
 
