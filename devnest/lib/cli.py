@@ -86,7 +86,8 @@ class Columns(object):
             Columns.CPU: node.node_details.get_capability('cpu'),
             Columns.RESERVED: node.get_reservation_owner(),
             Columns.UNTIL: node.get_reservation_endtime(),
-            Columns.GROUPS: node.node_details.get_node_labels(),
+            Columns.GROUPS: ",".join(sorted(
+                                     node.node_details.get_node_labels())),
             Columns.CAPABILITIES: node.node_details.get_capabilities(),
         }[column]
 
