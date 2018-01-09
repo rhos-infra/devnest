@@ -37,7 +37,7 @@ END_TAG = '}#>'
 class NodeStatus(object):
     """Enumeration for the Node status."""
     (UNKNOWN, ONLINE, OFFLINE, TEMPORARILY_OFFLINE,
-     RESERVED, REPROVISION) = range(6)
+     RESERVED, REPROVISION, REPROVISION_PENDING) = range(7)
 
 
 class NodeData(object):
@@ -66,14 +66,32 @@ class NodeReservation(object):
         reservation_starttime (:obj:`float`): EPOCH time when reserved
         reservation_endtime (:obj:`float`): EPOCH time when reservation expires
         reservation_owner (:obj:`str`): user who reserved node
+        reprovision_pending (:obj:`bool`): if reprovision is pending
     """
     def __init__(self, reservation_starttime, reservation_endtime,
-                 reservation_owner):
+                 reservation_owner, reprovision_pending=False):
         self.reservation_starttime = reservation_starttime
         self.reservation_endtime = reservation_endtime
         self.reservation_owner = reservation_owner
         self.reserve_str = time.strftime("%Y/%m/%d, %H:%M:%S",
                                          time.localtime(reservation_endtime))
+        self.reprovision_pending = reprovision_pending
+
+    def get_reprovision_pending(self):
+        """Return information if reprovision of node is pending (ongoing).
+
+        Returns:
+            (:obj:`bool`): True if reprovision is pending False otherwise
+        """
+        return self.reprovision_pending
+
+    def set_reprovision_pending(self, reprovision_pending):
+        """Set information if reprovision of node is pending (ongoing).
+
+        Args:
+            (:obj:`bool`): True if reprovision is pending False otherwise
+        """
+        self.reprovision_pending = reprovision_pending
 
     def get_reservation_endtime(self):
         """Return user friendly string of time when reservation expires.
@@ -112,7 +130,8 @@ class NodeReservation(object):
             'reservedUntil': self.reserve_str,
             'startTime': self.reservation_starttime,
             'endTime': self.reservation_endtime,
-            'owner': self.reservation_owner
+            'owner': self.reservation_owner,
+            'reprovisionPending': self.reprovision_pending
         }}
 
         return json.dumps(reservation)
@@ -273,7 +292,7 @@ class Node(object):
         self.node_details = self._node_details_from_description(description)
         self._config = None
 
-    def reserve(self, reservation_time, owner=None):
+    def reserve(self, reservation_time, owner=None, reprovision_pending=False):
         """Marks node as reserved for requested time.
         Reserved node is put temporarily offline, is it can finish currently
         running task and metadata is stored in the offline reason section
@@ -286,6 +305,7 @@ class Node(object):
         Args:
             reservation_time (:obj:`int`): Requested reservation time in Hours
             owner (:obj:`int`): Override automatically discovered username
+            reprovision_pending (:obj:`bool`): If reprovision pending state
         """
         LOG.info('Attempting to reserve node: %s for %s Hours' % (
                  self.get_name(), reservation_time))
@@ -305,7 +325,8 @@ class Node(object):
         offset_time = timedelta(hours=reservation_time).total_seconds()
         end_time = start_time + offset_time
 
-        reservation_info = NodeReservation(start_time, end_time, owner)
+        self.reservation_info = NodeReservation(start_time, end_time, owner,
+                                                reprovision_pending)
 
         jenkins_node = self.jenkins.get_node(self.get_name())
 
@@ -316,7 +337,7 @@ class Node(object):
         for slave_element in slave_xml.findall('launcher'):
             ip_address = slave_element.find('host').text
 
-        jenkins_node.toggle_temporarily_offline(str(reservation_info))
+        jenkins_node.toggle_temporarily_offline(str(self.reservation_info))
 
         LOG.info('Node: %s reserved for %s Hours by %s' % (
                  self.get_name(), reservation_time, owner))
@@ -332,6 +353,18 @@ class Node(object):
 
         LOG.info('Cancel reservation with "devnest release'
                  ' %s"' % (self.get_name()))
+
+    def set_reprovision_pending(self):
+        """Sets node as in reprovision pending state"""
+        LOG.info('Marking %s as reprovision pending' % self.get_name())
+        if not self.reservation_info and self.node_status == NodeStatus.ONLINE:
+            LOG.info('Node %s is online, reserving...' % self.get_name())
+            self.reserve(0, owner='devnest_reprovisioner',
+                         reprovision_pending=True)
+        else:
+            self.reservation_info.clear_reservation_endtime()
+            self.reservation_info.set_reprovision_pending(True)
+            self._set_offline_cause(str(self.reservation_info))
 
     def clear_reservation(self, bring_online=False):
         """Clears reservation for particular node and optionally
@@ -389,6 +422,9 @@ class Node(object):
         if self.node_status == NodeStatus.REPROVISION:
             return "pending"
 
+        if self.node_status == NodeStatus.REPROVISION_PENDING:
+            return "reprovisioning"
+
         return "Unknown"
 
     def get_name(self):
@@ -433,12 +469,18 @@ class Node(object):
         offline = self.node_data.get('offline')
         reservation_endtime = self._get_reservation_endtime_epoch()
         current_time = time.time()
+        reprovision_pending = False
+        if self.reservation_info:
+            reprovision_pending \
+                = self.reservation_info.get_reprovision_pending()
 
         if reservation_endtime and reservation_endtime > current_time:
             return NodeStatus.RESERVED
 
         if reservation_endtime and reservation_endtime <= current_time:
-            return NodeStatus.REPROVISION
+            if not reprovision_pending:
+                return NodeStatus.REPROVISION
+            return NodeStatus.REPROVISION_PENDING
 
         if offline:
             return NodeStatus.OFFLINE
@@ -517,9 +559,12 @@ class Node(object):
                     owner = str(res_data.get('owner'))
                     start_time = float(res_data.get('startTime'))
                     end_time = float(res_data.get('endTime'))
+                    reprovision_pending = bool(res_data.get(
+                                               'reprovisionPending'))
 
-                    reservation_info = NodeReservation(start_time,
-                                                       end_time, owner)
+                    reservation_info = NodeReservation(start_time, end_time,
+                                                       owner,
+                                                       reprovision_pending)
 
             except ValueError:
                 LOG.debug('Could not read reservation data for node %s,'

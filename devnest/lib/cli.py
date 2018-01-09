@@ -210,6 +210,9 @@ class JenkinsNodeShell(object):
         release_parser.add_argument('-o', '--online',
                                     action='store_true',
                                     help=argparse.SUPPRESS)
+        release_parser.add_argument('-p', '--pending',
+                                    action='store_true',
+                                    help=argparse.SUPPRESS)
 
         # Group parser
         groups_parser = argparse.ArgumentParser(add_help=False)
@@ -364,15 +367,18 @@ class JenkinsNodeShell(object):
 
             reserve_node = jenkins_nodes[0]
 
-            reserve_user = reserve_node.get_reservation_owner()
-            jenkins_user = jenkins_obj.get_jenkins_username()
-            if reserve_user != jenkins_user and not parser_args.force:
-                err_msg = "Node %s is reserved by %s and can not " \
-                          "be released unless used with --force flag." \
-                    % (reserve_node.get_name(), reserve_user)
-                raise CommandError(err_msg)
+            if parser_args.pending:
+                reserve_node.set_reprovision_pending()
+            else:
+                reserve_user = reserve_node.get_reservation_owner()
+                jenkins_user = jenkins_obj.get_jenkins_username()
+                if reserve_user != jenkins_user and not parser_args.force:
+                    err_msg = "Node %s is reserved by %s and can not " \
+                              "be released unless used with --force flag." \
+                        % (reserve_node.get_name(), reserve_user)
+                    raise CommandError(err_msg)
 
-            reserve_node.clear_reservation(bring_online=parser_args.online)
+                reserve_node.clear_reservation(bring_online=parser_args.online)
 
         # Group manage
         if parser_args.action is Action.GROUP:
