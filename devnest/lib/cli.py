@@ -43,7 +43,7 @@ LIST_FORMATS = ['csv', 'table']
 
 class Action(object):
     """Enumeration for the CLI Action."""
-    (LIST, RELEASE, RESERVE, GROUP, CAPABILITIES) = range(5)
+    (LIST, RELEASE, RESERVE, GROUP, CAPABILITIES, SETUP) = range(6)
 
 
 class Columns(object):
@@ -257,6 +257,17 @@ class JenkinsNodeShell(object):
                                            formatter_class=formatter,
                                            help='manage node capabilities')
         capability.set_defaults(action=Action.CAPABILITIES)
+
+        # Node setup parser
+        setup = subparsers.add_parser('setup',
+                                      formatter_class=formatter,
+                                      help='setup node based on the XML')
+        setup.add_argument('-f', '--file',
+                           required=True,
+                           help='node config file')
+
+        setup.set_defaults(action=Action.SETUP)
+
         return parser
 
     def _get_default_config(self):
@@ -421,6 +432,10 @@ class JenkinsNodeShell(object):
             if parser_args.set:
                 for node in jenkins_nodes:
                     node.update_capabilities(parser_args.set)
+
+        if parser_args.action is Action.SETUP:
+            if parser_args.file:
+                jenkins_obj.create_update_node_from_xml(parser_args.file)
 
 
 def _get_node_table_str(jenkins_nodes, columns=Columns.DEFAULT):

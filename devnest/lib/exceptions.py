@@ -60,6 +60,11 @@ class NodeDataError(NodeCliException):
         super(self.__class__, self).__init__(msg)
 
 
+class NodeConfigError(NodeCliException):
+    def __init__(self, msg):
+        super(self.__class__, self).__init__(msg)
+
+
 class NodeReservationError(NodeCliException):
     def __init__(self, msg):
         super(self.__class__, self).__init__(msg)

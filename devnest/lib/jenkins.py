@@ -19,11 +19,16 @@ import ConfigParser
 import requests
 import fnmatch
 
+from os import access, R_OK
+from os.path import isfile
+
 from devnest.lib import exceptions
 from devnest.lib import logger
 from devnest.lib.node import Node
 from jenkinsapi.jenkins import Jenkins
 from jenkinsapi.utils.requester import Requester
+from jenkinsapi.custom_exceptions import JenkinsAPIException
+from xml.etree import ElementTree
 requests.packages.urllib3.disable_warnings()
 
 LOG = logger.LOG
@@ -92,6 +97,55 @@ class JenkinsInstance(object):
                     self.jenkins_nodes.append(cur_node)
 
         return self.jenkins_nodes
+
+    def create_update_node_from_xml(self, xml_path):
+        """Create or update node based on passed path to XML file
+
+        Raises:
+            NodeConfigError: If XML is invalid.
+
+        Args:
+            xml_path (:obj:`str`): path to XML file with node details
+        """
+
+        if not isfile(xml_path):
+            raise exceptions.NodeConfigError("Node config is not regular "
+                                             "file: %s" % xml_path)
+        if not access(xml_path, R_OK):
+            raise exceptions.NodeConfigError("Node config is not readable: "
+                                             "%s" % xml_path)
+
+        slave_name = None
+
+        try:
+            slave_xml = ElementTree.parse(xml_path)
+            slave_name = slave_xml.find('name').text
+        except ElementTree.ParseError:
+            raise exceptions.NodeConfigError("Improper XML node config: "
+                                             "%s" % xml_path)
+
+        if not slave_name or len(slave_name) == 0:
+            raise exceptions.NodeConfigError("Node name not found in config: "
+                                             "%s" % xml_path)
+
+        baseurl = '%s/computer/%s' % (self.jenkins.baseurl, slave_name)
+
+        config_str = ElementTree.tostring(slave_xml.getroot())
+
+        LOG.info('Node config: %s using file: %s' % (slave_name, xml_path))
+
+        try:
+            self.jenkins.requester.post_and_confirm_status("%s/config.xml"
+                                                           % baseurl,
+                                                           data=config_str)
+        except JenkinsAPIException:
+            LOG.debug('Node %s not found, adding new' % slave_name)
+            self.jenkins.create_node(slave_name, labels='provisioning_node')
+            self.jenkins.requester.post_and_confirm_status("%s/config.xml"
+                                                           % baseurl,
+                                                           data=config_str)
+
+        LOG.info('Node %s updated' % slave_name)
 
     def get_jenkins_username(self):
         """Return jenkins username used to log in.
