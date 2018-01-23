@@ -41,7 +41,7 @@ LOG = logging.getLogger(LOGGER_NAME)
 LOG.setLevel(DEFAULT_LOG_LEVEL)
 
 # Create stream handler with debug level
-sh = logging.StreamHandler()
+sh = logging.StreamHandler(sys.stderr)
 sh.setLevel(logging.DEBUG)
 
 # Add the logger_formatter to sh
