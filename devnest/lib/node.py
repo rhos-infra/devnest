@@ -519,7 +519,7 @@ class Node(object):
             details_start = description.index(START_TAG) + len(START_TAG)
             details_end = description.index(END_TAG, details_start)
             details_json = description[details_start:details_end]
-            json_data = json.loads(details_json.replace("'",'"'))
+            json_data = json.loads(details_json.replace("'", '"'))
             node_labels = json_data.get('reservation').get('labels')
             capabilities = json_data.get('capabilities')
         except (ValueError, AttributeError):

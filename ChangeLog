@@ -1,0 +1,29 @@
+CHANGES
+=======
+
+* Fix parsing of json if one contains wrong quotes
+* Add functions to setup slave based on XML file
+* Fix function argument name
+* Added AUTHORS file
+* Added option to set reprovision pending state
+* Enhance groups in columns to be comma separated list
+* Updated options to be more user friendly
+* Enable packaging
+* User can select parseable type output
+* Default location for config file
+* Rename Jenkins to DevNest
+* Added extra metadata to easy login to the box
+* Rename jenkinsnodecli to devnest
+* Added vCPU capability
+* Introduced node capabilities
+* Changed column names in the output
+* Changed termnology for the node status
+* Add option to specify owner who reserved the node
+* Fixed issue where node was not in sync with description
+* Added options to manage node groups/labels
+* Changed CLI arguments and supporting functions to be more restrictive for standard user, e.g. one user can't release box of another user
+* Added info for the better user experience
+* Fix improper call to Jenkins.node (performance)
+* Fixed function get\_reservation\_endtime\_epoch
+* Added error when no argument is specified
+* Initial commit of Jenkins Node CLI
