@@ -37,7 +37,7 @@ JENKINS_API_TOKEN can be found using Jenkins at:
 Running in virtual environment:
 
 ```
-git clone https://github.com/mpryc/devnest.git
+git clone https://github.com/rhos-infra/devnest.git
 virtualenv my-devnest-virtenv
 source my-devnest-virtenv/bin/activate
 pushd devnest
