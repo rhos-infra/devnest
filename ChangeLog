@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Updated links after moving devnest from private to rhos-infra repo
+* Fix linting
 * Fix parsing of json if one contains wrong quotes
 * Add functions to setup slave based on XML file
 * Fix function argument name

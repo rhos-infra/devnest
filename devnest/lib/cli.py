@@ -191,6 +191,9 @@ class JenkinsNodeShell(object):
                                  default=Columns.DEFAULT,
                                  help='Columns to show')
 
+        list_parser.add_argument('-s', '--state',
+                                 help='Limit output to defined state only')
+
         # Reserve
         reserve_parser.add_argument('-t', '--time',
                                     type=int,
@@ -326,6 +329,11 @@ class JenkinsNodeShell(object):
                 group = None
 
             jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group)
+
+            if parser_args.state:
+                jenkins_nodes = [node for node in jenkins_nodes
+                                 if parser_args.state.lower()
+                                 in node.get_node_status_str()]
 
             if parser_args.format is None or parser_args.format == 'table':
                 print(_get_node_table_str(jenkins_nodes, parser_args.column))
