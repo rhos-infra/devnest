@@ -374,6 +374,7 @@ class Node(object):
 
         if bring_online and self.node_status != NodeStatus.ONLINE:
             node = self._get_node_instance()
+            node.toggle_temporarily_offline()
             node.set_online()
             LOG.info('Node %s is no longer reserved' % self.get_name())
         elif bring_online:
