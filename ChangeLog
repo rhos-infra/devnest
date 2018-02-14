@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Ensure node is temp offline before marking it online
+* Add option to list nodes based on state
 * Updated links after moving devnest from private to rhos-infra repo
 * Fix linting
 * Fix parsing of json if one contains wrong quotes

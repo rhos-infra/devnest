@@ -346,8 +346,8 @@ class Node(object):
         password = self.node_details.get_capability('password')
 
         if username and len(username) > 0 and password and len(password) > 0:
-            LOG.info('Node access: $ sshpass -p %s '
-                     'ssh %s@%s' % (password, username, ip_address))
+            LOG.info('Node access (pass: "%s"): $ ssh %s@%s'
+                     % (password, username, ip_address))
         else:
             LOG.info('Node ssh: %s' % (ip_address))
 
@@ -374,7 +374,10 @@ class Node(object):
 
         if bring_online and self.node_status != NodeStatus.ONLINE:
             node = self._get_node_instance()
-            node.toggle_temporarily_offline()
+
+            if not node.is_temporarily_offline():
+                node.toggle_temporarily_offline("Devnest bringing node back...")
+
             node.set_online()
             LOG.info('Node %s is no longer reserved' % self.get_name())
         elif bring_online:
