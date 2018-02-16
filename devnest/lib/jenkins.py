@@ -26,7 +26,7 @@ from devnest.lib import exceptions
 from devnest.lib import logger
 from devnest.lib.node import Node
 from jenkinsapi.jenkins import Jenkins
-from jenkinsapi.utils.requester import Requester
+from jenkinsapi.utils.crumb_requester import CrumbRequester
 from jenkinsapi.custom_exceptions import JenkinsAPIException
 from xml.etree import ElementTree
 requests.packages.urllib3.disable_warnings()
@@ -161,11 +161,12 @@ class JenkinsInstance(object):
         Returns:
             (:obj:`Jenkins`): Jenkins object instance.
         """
+
         jenkins_obj = Jenkins(self.jenkins_url,
-                              requester=Requester(self.jenkins_username,
-                                                  self.jenkins_password,
-                                                  baseurl=self.jenkins_url,
-                                                  ssl_verify=False))
+                              requester=CrumbRequester(self.jenkins_username,
+                                                       self.jenkins_password,
+                                                       baseurl=self.jenkins_url,
+                                                       ssl_verify=False))
 
         LOG.debug('Connected to Jenkins, Version: %s' % jenkins_obj.version)
 
