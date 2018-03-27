@@ -103,26 +103,32 @@ class JenkinsNodeShell(object):
         config_group = config_parser.add_argument_group()
 
         config_group.add_argument('--conf',
+                                  default=os.environ.get('DEVNEST_CONF', None),
                                   help='Configuration file. [jenkins] section '
                                        'is the same as in '
-                                       'jenkins-job-builder.')
+                                       'jenkins-job-builder. [DEVNEST_CONF]')
 
         config_group.add_argument('--url',
+                                  default=os.environ.get('DEVNEST_URL', None),
                                   help='The Jenkins URL to use.'
                                        'This overrides the url specified in '
-                                       'the configuration file')
+                                       'the configuration file. [DEVNEST_URL]')
 
         config_group.add_argument('-u', '--user',
+                                  default=os.environ.get('DEVNEST_USER', None),
                                   help='The Jenkins user to use for '
                                        'authentication. This overrides the '
                                        'user specified in the configuration '
-                                       'file')
+                                       'file. [DEVNEST_USER]')
 
         config_group.add_argument('-p', '--password',
+                                  default=os.environ.get('DEVNEST_PASSWORD',
+                                                         None),
                                   help='Password or API token to use for '
                                        'authenticating towards Jenkins. '
                                        'This overrides the password specified '
-                                       'in the configuration file.')
+                                       'in the configuration file. '
+                                       '[DEVNEST_PASSWORD]')
 
         # Main parser
         parser = argparse.ArgumentParser(prog='devnest',
@@ -141,7 +147,8 @@ class JenkinsNodeShell(object):
 
         parser.add_argument('-v', '--verbose',
                             action='store_true',
-                            help='increase output verbosity')
+                            default=os.environ.get('DEVNEST_VERBOSE', False),
+                            help='increase output verbosity. [DEVNEST_VERBOSE]')
 
         # Node parser is used by multiple subparsers
         node_parser = argparse.ArgumentParser(add_help=False)
@@ -318,7 +325,6 @@ class JenkinsNodeShell(object):
         parser_args = self.parse_args(argv)
         LOG.debug("%s" % parser_args)
 
-        LOG.info("Connecting to Jenkins...")
         jenkins_obj = JenkinsInstance(parser_args.url, parser_args.user,
                                       parser_args.password, parser_args.conf)
 
