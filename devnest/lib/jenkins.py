@@ -61,7 +61,7 @@ class JenkinsInstance(object):
         self.jenkins_username = config_username if not username else username
         self.jenkins_password = config_password if not password else password
 
-        LOG.debug('Using Jenkins URL: %s' % self.jenkins_url)
+        LOG.info('Using Jenkins URL: %s' % self.jenkins_url)
         LOG.debug('Using username: %s' % self.jenkins_username)
         LOG.debug('Using password: %s' % self.jenkins_password)
 
@@ -190,12 +190,11 @@ class JenkinsInstance(object):
         cfg = config.read(config_file)
 
         if len(cfg) == 1:
-            try:
-                url = config.get("jenkins", "url")
-                username = config.get("jenkins", "user")
-                password = config.get("jenkins", "password")
-            except ConfigParser.NoSectionError:
-                raise exceptions.ConfigParser("Failed to get username, "
-                                              "password or url from config "
-                                              "file.")
-        return url, username, password
+            url = config.get("jenkins", "url")
+            username = config.get("jenkins", "user")
+            password = config.get("jenkins", "password")
+            return url, username, password
+
+        raise exceptions.ConfigParser("Failed to get username, "
+                                      "password or url from config "
+                                      "file (%s)." % config_file)
