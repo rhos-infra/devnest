@@ -37,7 +37,7 @@ END_TAG = '}#>'
 class NodeStatus(object):
     """Enumeration for the Node status."""
     (UNKNOWN, ONLINE, OFFLINE, TEMPORARILY_OFFLINE,
-     RESERVED, REPROVISION, REPROVISION_PENDING) = range(7)
+     RESERVED, REPROVISION, REPROVISION_PENDING, JOB_RUNNING) = range(8)
 
 
 class NodeData(object):
@@ -429,6 +429,9 @@ class Node(object):
         if self.node_status == NodeStatus.REPROVISION_PENDING:
             return "reprovisioning"
 
+        if self.node_status == NodeStatus.JOB_RUNNING:
+            return "CI job running"
+
         return "Unknown"
 
     def get_name(self):
@@ -491,6 +494,9 @@ class Node(object):
 
         if temp_offline:
             return NodeStatus.TEMPORARILY_OFFLINE
+
+        if not self.node_data.get('idle'):
+            return NodeStatus.JOB_RUNNING
 
         return NodeStatus.ONLINE
 
