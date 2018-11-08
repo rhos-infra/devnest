@@ -292,7 +292,8 @@ class Node(object):
         self.node_details = self._node_details_from_description(description)
         self._config = None
 
-    def reserve(self, reservation_time, owner=None, reprovision_pending=False):
+    def reserve(self, reservation_time, owner=None, reprovision_pending=False,
+                force_reserve=False):
         """Marks node as reserved for requested time.
         Reserved node is put temporarily offline, is it can finish currently
         running task and metadata is stored in the offline reason section
@@ -306,13 +307,19 @@ class Node(object):
             reservation_time (:obj:`int`): Requested reservation time in Hours
             owner (:obj:`int`): Override automatically discovered username
             reprovision_pending (:obj:`bool`): If reprovision pending state
+            force_reserve (:obj:`bool`): Reserve even if node is running CI job
         """
         LOG.info('Attempting to reserve node: %s for %s Hours' % (
                  self.get_name(), reservation_time))
 
-        if self.node_status != NodeStatus.ONLINE:
+        if self.node_status != NodeStatus.ONLINE and not force_reserve:
             raise NodeReservationError("Node %s is not Online and "
                                        "can't be reserved." % self.get_name())
+
+        if (self.node_status != NodeStatus.JOB_RUNNING and
+           self.node_status != NodeStatus.ONLINE) and force_reserve:
+            raise NodeReservationError("--force can be used only when node %s"
+                                       " is running CI job." % self.get_name())
 
         if self.reservation_info is not None:
             raise NodeReservationError("Node %s is not released properly and "
@@ -390,6 +397,13 @@ class Node(object):
                      'reprovisioned' % self.get_name())
         else:
             LOG.info('Node %s is not reserved' % self.get_name())
+
+    def get_node_url(self):
+        """Get node URL
+        Returns:
+            (:obj:`str`): node url
+        """
+        return self.jenkins.get_nodes_url() + "/" + self.get_name()
 
     def get_reservation_endtime(self):
         if self.reservation_info:
@@ -471,6 +485,10 @@ class Node(object):
                                  Reserved, Offline, etc...)
         """
 
+        # First check if the node is unused
+        if not self.node_data.get('idle'):
+            return NodeStatus.JOB_RUNNING
+
         # If it's not offline it may be temporarily offline
         temp_offline = self.node_data.get('temporarilyOffline')
         offline = self.node_data.get('offline')
@@ -494,9 +512,6 @@ class Node(object):
 
         if temp_offline:
             return NodeStatus.TEMPORARILY_OFFLINE
-
-        if not self.node_data.get('idle'):
-            return NodeStatus.JOB_RUNNING
 
         return NodeStatus.ONLINE
 

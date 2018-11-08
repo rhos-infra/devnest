@@ -211,6 +211,13 @@ class JenkinsNodeShell(object):
         reserve_parser.add_argument('-o', '--owner',
                                     help=argparse.SUPPRESS)
 
+        # Reserve - force reserves server on which CI job is running
+        reserve_parser.add_argument('-f', '--force',
+                                    action='store_true',
+                                    help='Force reserve even if CI job is running.'
+                                         'After such reservation wait until CI job will '
+                                         'finish - state will become "reserved"')
+
         # Release - force releases server reserved by different user
         release_parser.add_argument('-f', '--force',
                                     action='store_true',
@@ -368,7 +375,24 @@ class JenkinsNodeShell(object):
                 raise CommandError(err_msg)
 
             reserve_node = jenkins_nodes[0]
-            if reserve_node.get_node_status() != NodeStatus.ONLINE:
+
+            if reserve_node.get_node_status() == NodeStatus.JOB_RUNNING and \
+               not parser_args.force:
+                err_msg = "Node %s is currently running CI job. Use --force flag " \
+                          "to reserve the node.\n\tAfter doing so, use:\n\t" \
+                          "    $ devnest list -g %s %s\n\tTo check if " \
+                          "CI job is finished and you can use it - node "\
+                          "status will become reserved.\n\tThis may take even few hours!" \
+                          "\n\tMore details about current node usage is available at:" \
+                          "\n\t    %s" \
+                          % (reserve_node.get_name(), group,
+                             reserve_node.get_name(),
+                             reserve_node.get_node_url())
+
+                raise CommandError(err_msg)
+
+            if reserve_node.get_node_status() != NodeStatus.ONLINE and \
+               not parser_args.force:
                 err_msg = "Node %s is not online and can not be reserved. " \
                     % reserve_node.get_name()
                 err_msg += "Node status: %s. Try release the node." \
@@ -376,7 +400,8 @@ class JenkinsNodeShell(object):
                 raise CommandError(err_msg)
 
             reservation_owner = parser_args.owner
-            reserve_node.reserve(reservation_time, owner=reservation_owner)
+            reserve_node.reserve(reservation_time, owner=reservation_owner,
+                                 force_reserve=parser_args.force)
 
         # Clear Reservation
         if parser_args.action is Action.RELEASE:
