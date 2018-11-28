@@ -43,7 +43,7 @@ LIST_FORMATS = ['csv', 'table']
 
 class Action(object):
     """Enumeration for the CLI Action."""
-    (LIST, RELEASE, RESERVE, GROUP, CAPABILITIES, SETUP) = range(6)
+    (LIST, RELEASE, RESERVE, GROUP, CAPABILITIES, SETUP, EXTEND) = range(7)
 
 
 class Columns(object):
@@ -189,6 +189,13 @@ class JenkinsNodeShell(object):
                                                help='reserve node')
         reserve_parser.set_defaults(action=Action.RESERVE)
 
+        extend_parser = subparsers.add_parser('extend',
+                                              parents=[node_parser],
+                                              formatter_class=formatter,
+                                              help='extend reservation')
+
+        extend_parser.set_defaults(action=Action.EXTEND)
+
         # List
         list_parser.add_argument('-f', '--format',
                                  default='table',
@@ -217,6 +224,17 @@ class JenkinsNodeShell(object):
                                     help='Force reserve even if CI job is running.'
                                          'After such reservation wait until CI job will '
                                          'finish - state will become "reserved"')
+
+        # Extend
+        extend_parser.add_argument('-t', '--time',
+                                   type=int,
+                                   required=True,
+                                   help='Time in hours for the reservation to be extended')
+
+        # Extend - force to extend node reserved by different user
+        extend_parser.add_argument('-f', '--force',
+                                   action='store_true',
+                                   help=argparse.SUPPRESS)
 
         # Release - force releases server reserved by different user
         release_parser.add_argument('-f', '--force',
@@ -402,6 +420,21 @@ class JenkinsNodeShell(object):
             reservation_owner = parser_args.owner
             reserve_node.reserve(reservation_time, owner=reservation_owner,
                                  force_reserve=parser_args.force)
+
+        # Extend Reservation
+        if parser_args.action is Action.EXTEND:
+            jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group=None)
+
+            if len(jenkins_nodes) != 1:
+                err_msg = "Found %s nodes maching your node pattern" \
+                          % len(jenkins_nodes)
+                if len(jenkins_nodes) > 1:
+                    err_msg += ". Please specify only one.\n" \
+                               + _get_node_table_str(jenkins_nodes)
+                raise CommandError(err_msg)
+
+            node = jenkins_nodes[0]
+            node.extend_reservation(parser_args.time, parser_args.force)
 
         # Clear Reservation
         if parser_args.action is Action.RELEASE:

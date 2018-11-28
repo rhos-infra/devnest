@@ -1,6 +1,10 @@
 CHANGES
 =======
 
+* Add option to force reserve node which is currently running CI job
+* Add new status for the node which isn't idle
+* Allows loading params from environment variables
+* Use CrumbRequester instead of Requester
 * Ensure node is temporary offline before bringing it online
 * Ensure node is temp offline before marking it online
 * Add option to list nodes based on state

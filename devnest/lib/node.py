@@ -361,6 +361,59 @@ class Node(object):
         LOG.info('Cancel reservation with "devnest release'
                  ' %s"' % (self.get_name()))
 
+    def extend_reservation(self, extend_reservation_time, force_username=False):
+        """Extend reservation for additional time.
+
+        Raises:
+            NodeReservationError: If there was error while making attempt to
+                                  extend reservation.
+
+        Args:
+            extend_reservation_time (:obj:`int`): Requested reservation time in Hours
+            force_username (:obj:`bool`): Extend even if not owner of reservation
+        """
+
+        reservation_owner = self.get_reservation_owner()
+
+        if not self.node_data.get('temporarilyOffline') or \
+           reservation_owner == "":
+            raise NodeReservationError("Node %s is currently not reserved nor "
+                                       "queued to be reserved. Reservation "
+                                       "can not be extended. Node state: %s" %
+                                       (self.get_name(),
+                                        self.get_node_status_str()))
+
+        if not force_username:
+            jenkins_user = self.jenkins.requester.username
+            if reservation_owner != jenkins_user:
+                raise NodeReservationError("Node %s is currently reserved by "
+                                           "%s. Use --force flag to extend "
+                                           "reservation for different user." %
+                                           (self.get_name(), reservation_owner))
+
+        LOG.info('Extending node reservation: %s by %s Hours' % (
+                 self.get_name(), extend_reservation_time))
+
+        res = self.reservation_info
+
+        # If reservation is pending reprovisioning, but it's not yet
+        # being reprovisioned, extend time from now, because
+        # reservation was already expired.
+        if self.get_node_status() == NodeStatus.REPROVISION:
+            start_time = time.time()
+            offset_time = timedelta(hours=extend_reservation_time).total_seconds()
+            new_end_time = start_time + offset_time
+        else:
+            offset_time = timedelta(hours=extend_reservation_time).total_seconds()
+            new_end_time = res.reservation_endtime + offset_time
+
+        new_reservation = NodeReservation(res.reservation_starttime,
+                                          new_end_time, res.reservation_owner,
+                                          False)
+        self._set_offline_cause(str(new_reservation))
+        LOG.info('Node %s is reserved until: %s' % (self.get_name(),
+                 new_reservation.get_reservation_endtime()))
+
     def set_reprovision_pending(self):
         """Sets node as in reprovision pending state"""
         LOG.info('Marking %s as reprovision pending' % self.get_name())
