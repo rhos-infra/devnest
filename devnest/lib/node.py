@@ -360,6 +360,11 @@ class Node(object):
 
         LOG.info('Cancel reservation with "devnest release'
                  ' %s"' % (self.get_name()))
+        return dict(
+            username=username,
+            password=password,
+            ip_address=ip_address,
+        )
 
     def extend_reservation(self, extend_reservation_time, force_username=False):
         """Extend reservation for additional time.

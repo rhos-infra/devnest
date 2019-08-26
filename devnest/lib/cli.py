@@ -26,6 +26,7 @@ from devnest.lib.node import NodeStatus
 
 import argparse
 import datetime
+import json
 import logging
 from terminaltables import AsciiTable
 import sys
@@ -52,6 +53,7 @@ class Columns(object):
      CAPABILITIES) = range(8)
 
     DEFAULT = 'host,state,ram,cpu,reserved,until'
+    DEFAULT_JSON = 'state,host'
 
     @staticmethod
     def get_columns(columns_string):
@@ -199,11 +201,11 @@ class JenkinsNodeShell(object):
         # List
         list_parser.add_argument('-f', '--format',
                                  default='table',
-                                 help='Parseable output, options: csv,table')
+                                 help='Parseable output, '
+                                 'options: csv,json,table')
 
         list_parser.add_argument('-c', '--column',
-                                 default=Columns.DEFAULT,
-                                 help='Columns to show')
+                                 help='Columns to show, default depends on format')
 
         list_parser.add_argument('-s', '--state',
                                  help='Limit output to defined state only')
@@ -213,6 +215,9 @@ class JenkinsNodeShell(object):
                                     type=int,
                                     default=3,
                                     help='Time in hours for the box to be reserved')
+        reserve_parser.add_argument('-j', '--json',
+                                    action='store_true',
+                                    help='Output node information in json')
 
         # Owner that reserved node.
         reserve_parser.add_argument('-o', '--owner',
@@ -367,8 +372,16 @@ class JenkinsNodeShell(object):
                                  in node.get_node_status_str()]
 
             if parser_args.format is None or parser_args.format == 'table':
+                if not parser_args.column:
+                    parser_args.column = Columns.DEFAULT
                 print(_get_node_table_str(jenkins_nodes, parser_args.column))
+            elif parser_args.format == 'json':
+                if not parser_args.column:
+                    parser_args.column = Columns.DEFAULT_JSON
+                print(_get_node_json_str(jenkins_nodes, parser_args.column))
             elif parser_args.format in LIST_FORMATS:
+                if not parser_args.column:
+                    parser_args.column = Columns.DEFAULT
                 print(_get_node_parseable_str(jenkins_nodes,
                                               parser_args.column))
             else:
@@ -418,8 +431,11 @@ class JenkinsNodeShell(object):
                 raise CommandError(err_msg)
 
             reservation_owner = parser_args.owner
-            reserve_node.reserve(reservation_time, owner=reservation_owner,
-                                 force_reserve=parser_args.force)
+            info = reserve_node.reserve(
+                reservation_time, owner=reservation_owner,
+                force_reserve=parser_args.force)
+            if parser_args.json:
+                print(json.dumps(info))
 
         # Extend Reservation
         if parser_args.action is Action.EXTEND:
@@ -510,6 +526,25 @@ class JenkinsNodeShell(object):
                 jenkins_obj.create_update_node_from_xml(parser_args.file)
 
 
+def _get_node_table(jenkins_nodes, columns=Columns.DEFAULT):
+    """Creates table with node info.
+
+    Args:
+        columns (:obj:`string`): comma separated list of columns
+
+    Returns:
+        (:obj:`list`): Table with node info
+    """
+    columns_list = Columns.get_columns(columns)
+    table_data = [[Columns.to_str(x) for x in columns_list]]
+
+    node_list = [[Columns.to_data(jenkins_node, column)
+                  for column in columns_list]
+                 for jenkins_node in jenkins_nodes]
+    table_data.extend(node_list)
+    return table_data
+
+
 def _get_node_table_str(jenkins_nodes, columns=Columns.DEFAULT):
     """Creates nicely formatted table with node info.
 
@@ -519,16 +554,8 @@ def _get_node_table_str(jenkins_nodes, columns=Columns.DEFAULT):
     Returns:
         (:obj:`str`): Table with node info ready to be printed
     """
-    columns_list = Columns.get_columns(columns)
-    table_data = [[Columns.to_str(x) for x in columns_list]]
-
-    node_list = [[Columns.to_data(jenkins_node, column)
-                  for column in columns_list]
-                 for jenkins_node in jenkins_nodes]
-    table_data.extend(node_list)
-
-    ascii_table = AsciiTable(table_data).table
-    return ascii_table
+    table_data = _get_node_table(jenkins_nodes, columns)
+    return AsciiTable(table_data).table
 
 
 def _get_node_parseable_str(jenkins_nodes, columns=Columns.DEFAULT):
@@ -550,6 +577,28 @@ def _get_node_parseable_str(jenkins_nodes, columns=Columns.DEFAULT):
             node_str += "\n"
         count += 1
     return node_str
+
+
+def _get_node_json_str(jenkins_nodes, columns=Columns.DEFAULT_JSON):
+    """Creates json node info.
+
+    Args:
+        columns (:obj:`string`): comma separated list of columns
+
+    Returns:
+        (:obj:`str`): Node info in json format
+    """
+    json_table = []
+    table_data = _get_node_table(jenkins_nodes, columns)
+    columns_table = columns.split(",")
+    header_row = True
+    for node_row in table_data:
+        if header_row:
+            header_row = False
+            continue
+        json_table.append(dict(zip(columns.split(","),node_row)))
+
+    return json.dumps(json_table)
 
 
 def main(args=None):
