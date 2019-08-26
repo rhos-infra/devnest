@@ -292,6 +292,12 @@ class Node(object):
         self.node_details = self._node_details_from_description(description)
         self._config = None
 
+    def to_dict(self):
+        return dict(
+            name=self.node_name,
+            status=self.get_node_status_str(),
+        )
+
     def reserve(self, reservation_time, owner=None, reprovision_pending=False,
                 force_reserve=False):
         """Marks node as reserved for requested time.
@@ -360,6 +366,11 @@ class Node(object):
 
         LOG.info('Cancel reservation with "devnest release'
                  ' %s"' % (self.get_name()))
+        return dict(
+            username=username,
+            password=password,
+            ip_address=ip_address,
+        )
 
     def extend_reservation(self, extend_reservation_time, force_username=False):
         """Extend reservation for additional time.

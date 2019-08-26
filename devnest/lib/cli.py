@@ -26,6 +26,7 @@ from devnest.lib.node import NodeStatus
 
 import argparse
 import datetime
+import json
 import logging
 from terminaltables import AsciiTable
 import sys
@@ -199,7 +200,8 @@ class JenkinsNodeShell(object):
         # List
         list_parser.add_argument('-f', '--format',
                                  default='table',
-                                 help='Parseable output, options: csv,table')
+                                 help='Parseable output, '
+                                 'options: csv,json,table')
 
         list_parser.add_argument('-c', '--column',
                                  default=Columns.DEFAULT,
@@ -213,6 +215,9 @@ class JenkinsNodeShell(object):
                                     type=int,
                                     default=3,
                                     help='Time in hours for the box to be reserved')
+        reserve_parser.add_argument('-j', '--json',
+                                    action='store_true',
+                                    help='Output node information in json')
 
         # Owner that reserved node.
         reserve_parser.add_argument('-o', '--owner',
@@ -368,6 +373,9 @@ class JenkinsNodeShell(object):
 
             if parser_args.format is None or parser_args.format == 'table':
                 print(_get_node_table_str(jenkins_nodes, parser_args.column))
+            elif parser_args.format == 'json':
+                print(json.dumps(list(map(lambda node: node.to_dict(),
+                                          jenkins_nodes))))
             elif parser_args.format in LIST_FORMATS:
                 print(_get_node_parseable_str(jenkins_nodes,
                                               parser_args.column))
@@ -418,8 +426,11 @@ class JenkinsNodeShell(object):
                 raise CommandError(err_msg)
 
             reservation_owner = parser_args.owner
-            reserve_node.reserve(reservation_time, owner=reservation_owner,
-                                 force_reserve=parser_args.force)
+            info = reserve_node.reserve(
+                reservation_time, owner=reservation_owner,
+                force_reserve=parser_args.force)
+            if parser_args.json:
+                print(json.dumps(info))
 
         # Extend Reservation
         if parser_args.action is Action.EXTEND:
