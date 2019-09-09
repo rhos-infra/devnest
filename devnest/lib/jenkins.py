@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2017 Red Hat, Inc.
+# Copyright 2019 Red Hat, Inc.
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -15,7 +15,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import ConfigParser
+try:
+    import ConfigParser
+except:
+    import configparser as ConfigParser
 import requests
 import fnmatch
 
