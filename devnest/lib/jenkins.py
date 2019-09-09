@@ -17,7 +17,7 @@
 
 try:
     import ConfigParser
-except:
+except ImportError:
     import configparser as ConfigParser
 import requests
 import fnmatch

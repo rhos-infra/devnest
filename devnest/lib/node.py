@@ -316,8 +316,8 @@ class Node(object):
             raise NodeReservationError("Node %s is not Online and "
                                        "can't be reserved." % self.get_name())
 
-        if (self.node_status != NodeStatus.JOB_RUNNING and
-           self.node_status != NodeStatus.ONLINE) and force_reserve:
+        if self.node_status != NodeStatus.JOB_RUNNING and \
+           self.node_status != NodeStatus.ONLINE and force_reserve:
             raise NodeReservationError("--force can be used only when node %s"
                                        " is running CI job." % self.get_name())
 

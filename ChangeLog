@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Add python3 compability
+* Allow to extend node which is already reserved
 * Add option to force reserve node which is currently running CI job
 * Add new status for the node which isn't idle
 * Allows loading params from environment variables
