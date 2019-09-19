@@ -395,7 +395,20 @@ class JenkinsNodeShell(object):
             group = parser_args.group
             if parser_args.all:
                 group = None
+
+            first_available = False
+            if not parser_args.node_regex:
+                first_available = True
+
             jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group)
+
+            jenkins_nodes_first = []
+            if first_available:
+                for jenkins_node in jenkins_nodes:
+                    if jenkins_node.get_node_status() == NodeStatus.ONLINE:
+                        jenkins_nodes_first = [jenkins_node]
+                        break
+                jenkins_nodes = jenkins_nodes_first
 
             if len(jenkins_nodes) != 1:
                 err_msg = "Found %s nodes maching your reservation" \
