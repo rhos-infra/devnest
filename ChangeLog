@@ -1,6 +1,9 @@
 CHANGES
 =======
 
+* If no regex is specified to match the host, reserve first available within group
+* Add json output to management command
+* Few tox fixes
 * Add python3 compability
 * Allow to extend node which is already reserved
 * Add option to force reserve node which is currently running CI job

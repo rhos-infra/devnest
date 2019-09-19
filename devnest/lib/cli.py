@@ -609,7 +609,7 @@ def _get_node_json_str(jenkins_nodes, columns=Columns.DEFAULT_JSON):
         if header_row:
             header_row = False
             continue
-        json_table.append(dict(zip(columns.split(","),node_row)))
+        json_table.append(dict(zip(columns_table, node_row)))
 
     return json.dumps(json_table)
 
