@@ -361,6 +361,7 @@ class Node(object):
         LOG.info('Cancel reservation with "devnest release'
                  ' %s"' % (self.get_name()))
         return dict(
+            host=self.get_name(),
             username=username,
             password=password,
             ip_address=ip_address,
