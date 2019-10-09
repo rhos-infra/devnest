@@ -411,7 +411,8 @@ class JenkinsNodeShell(object):
                 if not jenkins_nodes_first and parser_args.force:
                     for jenkins_node in jenkins_nodes:
                         status = jenkins_node.get_node_status()
-                        if status == NodeStatus.JOB_RUNNING:
+                        reserved_by = jenkins_node.get_reservation_owner()
+                        if status == NodeStatus.JOB_RUNNING and not reserved_by:
                             jenkins_nodes_first = [jenkins_node]
                             break
                 jenkins_nodes = jenkins_nodes_first
