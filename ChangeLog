@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* Add host to json output when reserving
+* Pep8 simple fix
 * If no regex is specified to match the host, reserve first available within group
 * Add json output to management command
 * Few tox fixes

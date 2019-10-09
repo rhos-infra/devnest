@@ -408,6 +408,12 @@ class JenkinsNodeShell(object):
                     if jenkins_node.get_node_status() == NodeStatus.ONLINE:
                         jenkins_nodes_first = [jenkins_node]
                         break
+                if not jenkins_nodes_first and parser_args.force:
+                    for jenkins_node in jenkins_nodes:
+                        status = jenkins_node.get_node_status()
+                        if status == NodeStatus.JOB_RUNNING:
+                            jenkins_nodes_first = [jenkins_node]
+                            break
                 jenkins_nodes = jenkins_nodes_first
 
             if len(jenkins_nodes) != 1:
