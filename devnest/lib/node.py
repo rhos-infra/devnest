@@ -741,6 +741,15 @@ class Node(object):
 
         self._update_node_with_node_details(node_details)
 
+    def get_node_config_xml(self):
+        """Get node config data
+
+        Returns:
+            (:obj:`string`): config in XML format
+        """
+        self._set_node_config()
+        return self._config
+
     def _update_node_with_node_details(self, node_details):
         """Update node with NodeDetails data.
 

@@ -21,6 +21,7 @@ from devnest.lib.jenkins import JenkinsInstance
 from requests.exceptions import ConnectionError
 from devnest.lib.exceptions import CommandError
 from devnest.lib.exceptions import NodeCliException
+from devnest.lib.exceptions import NodeConfigError
 from devnest.lib.exceptions import NodeReservationError
 from devnest.lib.node import NodeStatus
 
@@ -44,7 +45,7 @@ LIST_FORMATS = ['csv', 'table']
 
 class Action(object):
     """Enumeration for the CLI Action."""
-    (LIST, RELEASE, RESERVE, GROUP, CAPABILITIES, SETUP, EXTEND) = range(7)
+    (LIST, RELEASE, RESERVE, GROUP, CAPABILITIES, SETUP, EXTEND, DUMP) = range(8)
 
 
 class Columns(object):
@@ -315,6 +316,17 @@ class JenkinsNodeShell(object):
 
         setup.set_defaults(action=Action.SETUP)
 
+        # Node dump parser
+        dump = subparsers.add_parser('dump',
+                                     parents=[node_parser],
+                                     formatter_class=formatter,
+                                     help='dump node config(s)')
+        dump.add_argument('-d', '--dir',
+                          required=True,
+                          help='output config(s) directory')
+
+        dump.set_defaults(action=Action.DUMP)
+
         return parser
 
     def _get_default_config(self):
@@ -554,6 +566,32 @@ class JenkinsNodeShell(object):
             elif parser_args.dir:
                 jenkins_obj.create_update_node_from_xml(parser_args.dir,
                                                         directory=True)
+
+        if parser_args.action is Action.DUMP:
+            if not os.path.isdir(parser_args.dir):
+                raise NodeConfigError("Output dir is not regular "
+                                      "directory: %s" % parser_args.dir)
+
+            if not os.access(parser_args.dir, os.W_OK):
+                raise NodeConfigError("Output dir is not writeable: "
+                                      "%s" % parser_args.dir)
+
+            jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex,
+                                                  group=None)
+
+            for node in jenkins_nodes:
+                if node.node_name == 'master':
+                    # master node does not have config.xml
+                    continue
+                node_config_str = node.get_node_config_xml()
+                config_xml_path = os.path.join(parser_args.dir,
+                                               "%s.xml" % node.node_name)
+                if os.path.isfile(config_xml_path):
+                    LOG.error('File already exists: %s' % config_xml_path)
+                    continue
+                with open(config_xml_path, 'w') as output_config:
+                    output_config.write(node_config_str)
+                    LOG.info('Config file saved: %s' % config_xml_path)
 
 
 def _get_node_table(jenkins_nodes, columns=Columns.DEFAULT):
