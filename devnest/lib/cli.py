@@ -299,12 +299,19 @@ class JenkinsNodeShell(object):
         capability.set_defaults(action=Action.CAPABILITIES)
 
         # Node setup parser
+        setup_options = argparse.ArgumentParser(add_help=False)
+        setup_opts_group = \
+            setup_options.add_mutually_exclusive_group(required=True)
+        setup_opts_group.add_argument('-f', '--file',
+                                      help='node config file')
+
+        setup_opts_group.add_argument('-d', '--dir',
+                                      help='node config(s) directory')
         setup = subparsers.add_parser('setup',
+                                      parents=[node_parser,
+                                               setup_options],
                                       formatter_class=formatter,
                                       help='setup node based on the XML')
-        setup.add_argument('-f', '--file',
-                           required=True,
-                           help='node config file')
 
         setup.set_defaults(action=Action.SETUP)
 
@@ -544,6 +551,9 @@ class JenkinsNodeShell(object):
         if parser_args.action is Action.SETUP:
             if parser_args.file:
                 jenkins_obj.create_update_node_from_xml(parser_args.file)
+            elif parser_args.dir:
+                jenkins_obj.create_update_node_from_xml(parser_args.dir,
+                                                        directory=True)
 
 
 def _get_node_table(jenkins_nodes, columns=Columns.DEFAULT):

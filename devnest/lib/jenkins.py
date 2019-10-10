@@ -22,8 +22,7 @@ except ImportError:
 import requests
 import fnmatch
 
-from os import access, R_OK
-from os.path import isfile
+import os
 
 from devnest.lib import exceptions
 from devnest.lib import logger
@@ -101,8 +100,37 @@ class JenkinsInstance(object):
 
         return self.jenkins_nodes
 
-    def create_update_node_from_xml(self, xml_path):
+    def _get_slave_xmls_from_dir(self, xml_directory):
+        slave_xmls = []
+        files = os.listdir(xml_directory)
+
+        for filepath in files:
+            full_filepath = os.path.join(xml_directory, filepath)
+            if full_filepath.lower().endswith(".xml"):
+                if not os.path.isfile(full_filepath):
+                    LOG.debug('Found XML file which is not valid'
+                              ' file: %s' % full_filepath)
+                if not os.access(full_filepath, os.R_OK):
+                    LOG.debug('XML file not readable: %s' % full_filepath)
+
+                slave_name = None
+
+                try:
+                    slave_xml = ElementTree.parse(full_filepath)
+                    slave_name = slave_xml.find('name').text
+                    if not slave_name or len(slave_name) == 0:
+                        LOG.error('Improper XML node config: '
+                                  '%s' % full_filepath)
+                    else:
+                        slave_xmls.append(full_filepath)
+                except ElementTree.ParseError:
+                    LOG.error('Improper XML node config: '
+                              '%s' % full_filepath)
+        return slave_xmls
+
+    def create_update_node_from_xml(self, xml_path, directory=False):
         """Create or update node based on passed path to XML file
+           or directory that contains XML files
 
         Raises:
             NodeConfigError: If XML is invalid.
@@ -111,44 +139,59 @@ class JenkinsInstance(object):
             xml_path (:obj:`str`): path to XML file with node details
         """
 
-        if not isfile(xml_path):
+        slave_xmls = []
+
+        if not directory and not os.path.isfile(xml_path):
             raise exceptions.NodeConfigError("Node config is not regular "
                                              "file: %s" % xml_path)
-        if not access(xml_path, R_OK):
+
+        if directory and not os.path.isdir(xml_path):
+            raise exceptions.NodeConfigError("Node config is not regular "
+                                             "directory: %s" % xml_path)
+
+        if not os.access(xml_path, os.R_OK):
             raise exceptions.NodeConfigError("Node config is not readable: "
                                              "%s" % xml_path)
 
-        slave_name = None
+        if directory:
+            slave_xmls = self._get_slave_xmls_from_dir(xml_path)
+            LOG.info('Found %s valid config files in directory: '
+                     '%s' % (len(slave_xmls), xml_path))
+        else:
+            slave_xmls = [xml_path]
 
-        try:
-            slave_xml = ElementTree.parse(xml_path)
-            slave_name = slave_xml.find('name').text
-        except ElementTree.ParseError:
-            raise exceptions.NodeConfigError("Improper XML node config: "
-                                             "%s" % xml_path)
+        for s_xml_path in slave_xmls:
+            slave_name = None
 
-        if not slave_name or len(slave_name) == 0:
-            raise exceptions.NodeConfigError("Node name not found in config: "
-                                             "%s" % xml_path)
+            try:
+                slave_xml = ElementTree.parse(s_xml_path)
+                slave_name = slave_xml.find('name').text
+            except ElementTree.ParseError:
+                raise exceptions.NodeConfigError("Improper XML node config: "
+                                                 "%s" % s_xml_path)
 
-        baseurl = '%s/computer/%s' % (self.jenkins.baseurl, slave_name)
+            if not slave_name or len(slave_name) == 0:
+                raise exceptions.NodeConfigError("Node name not found in config: "
+                                                 "%s" % s_xml_path)
 
-        config_str = ElementTree.tostring(slave_xml.getroot())
+            baseurl = '%s/computer/%s' % (self.jenkins.baseurl, slave_name)
 
-        LOG.info('Node config: %s using file: %s' % (slave_name, xml_path))
+            config_str = ElementTree.tostring(slave_xml.getroot())
 
-        try:
-            self.jenkins.requester.post_and_confirm_status("%s/config.xml"
-                                                           % baseurl,
-                                                           data=config_str)
-        except JenkinsAPIException:
-            LOG.debug('Node %s not found, adding new' % slave_name)
-            self.jenkins.create_node(slave_name, labels='provisioning_node')
-            self.jenkins.requester.post_and_confirm_status("%s/config.xml"
-                                                           % baseurl,
-                                                           data=config_str)
+            LOG.info('Node config: %s using file: %s' % (slave_name, s_xml_path))
 
-        LOG.info('Node %s updated' % slave_name)
+            try:
+                self.jenkins.requester.post_and_confirm_status("%s/config.xml"
+                                                               % baseurl,
+                                                               data=config_str)
+            except JenkinsAPIException:
+                LOG.debug('Node %s not found, adding new' % slave_name)
+                self.jenkins.create_node(slave_name, labels='provisioning_node')
+                self.jenkins.requester.post_and_confirm_status("%s/config.xml"
+                                                               % baseurl,
+                                                               data=config_str)
+
+            LOG.info('Node %s updated' % slave_name)
 
     def get_jenkins_username(self):
         """Return jenkins username used to log in.
