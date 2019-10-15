@@ -51,9 +51,9 @@ class Action(object):
 class Columns(object):
     """Enumeration for the columns."""
     (HOST, STATE, RAM, CPU, RESERVED, UNTIL, GROUPS,
-     CAPABILITIES) = range(8)
+     CAPABILITIES, IP_ADDRESS) = range(9)
 
-    DEFAULT = 'host,state,ram,cpu,reserved,until'
+    DEFAULT = 'host,state,ram,cpu,reserved,until,ip_address'
     DEFAULT_JSON = 'state,host'
 
     @staticmethod
@@ -78,6 +78,7 @@ class Columns(object):
             Columns.UNTIL: 'Reserved until',
             Columns.GROUPS: 'Groups',
             Columns.CAPABILITIES: 'Capabilities',
+            Columns.IP_ADDRESS: 'IP Address',
         }[column]
 
     @staticmethod
@@ -92,6 +93,7 @@ class Columns(object):
             Columns.GROUPS: ",".join(sorted(
                                      node.node_details.get_node_labels())),
             Columns.CAPABILITIES: node.node_details.get_capabilities(),
+            Columns.IP_ADDRESS: node.get_node_ip_address(),
         }[column]
 
 

@@ -25,6 +25,7 @@ from xml.etree import ElementTree
 
 import json
 import re
+import socket
 import time
 
 LOG = logger.LOG
@@ -506,6 +507,25 @@ class Node(object):
             return "CI job running"
 
         return "Unknown"
+
+    def get_node_ip_address(self):
+        """Return IP address of the node.
+
+        Returns:
+            (:obj:`str`): node IP address or empty string
+        """
+        ip_address = None
+        description = self.node_data.get('description')
+        ip_address = re.findall(r'[0-9]+(?:\.[0-9]+){3}', description)
+
+        if ip_address and len(ip_address) == 1:
+            try:
+                socket.inet_aton(ip_address[0])
+                ip_address = ip_address[0]
+            except socket.error:
+                ip_address = ""
+
+        return ip_address
 
     def get_name(self):
         """Return name of the node.

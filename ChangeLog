@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* Add dump config options
 * Add directory options to update multiply slaves at once
 * Ensure force reservation is only for not reserved nodes
 * Add force reserve without specific node
