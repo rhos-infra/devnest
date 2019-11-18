@@ -6,3 +6,5 @@
 /dist
 /ChangeLog
 /.eggs
+/.idea/
+.idea/

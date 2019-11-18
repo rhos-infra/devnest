@@ -176,9 +176,9 @@ class JenkinsNodeShell(object):
                                 help=argparse.SUPPRESS)
 
         disconnect_parser = subparsers.add_parser('disconnect',
-                                            parents=[node_parser, nest_parser],
-                                            formatter_class=formatter,
-                                            help='disconnect node(s) from Jenkins master')
+                                                  parents=[node_parser, nest_parser],
+                                                  formatter_class=formatter,
+                                                  help='disconnect node(s) from Jenkins master')
         disconnect_parser.set_defaults(action=Action.DISCONNECT)
 
         list_parser = subparsers.add_parser('list',
@@ -468,7 +468,7 @@ class JenkinsNodeShell(object):
             if reserve_node.get_node_status() == NodeStatus.JOB_RUNNING and \
                not parser_args.force:
                 err_msg = "A CI job is is currently running on %s node. Use --force flag " \
-                          "to reserve the node.\n\tIt will be reserved and available once the currently \ " \
+                          "to reserve the node.\n\tIt will be reserved and available once the currently " \
                           "running CI job finishes\n\tUse:\n\t" \
                           "    $ devnest list -g %s %s\n\tto check if " \
                           "CI job has finished and you can use it, if so the node "\
