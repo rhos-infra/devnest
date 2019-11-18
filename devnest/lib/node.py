@@ -770,6 +770,15 @@ class Node(object):
         self._set_node_config()
         return self._config
 
+    def disconnect(self, msg='disconnected_by_devnest'):
+        """Disconnect the node from Jenkins master
+        """
+        node_url = self.get_node_url()
+
+        LOG.info('Disconnecting %s from Jenkins master' % self.node_name)
+
+        self.jenkins.requester.post_and_confirm_status("%s/doDisconnect?offlineMessage=%s" % (node_url, msg), data={} )
+
     def _update_node_with_node_details(self, node_details):
         """Update node with NodeDetails data.
 
