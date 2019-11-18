@@ -45,7 +45,7 @@ LIST_FORMATS = ['csv', 'table']
 
 class Action(object):
     """Enumeration for the CLI Action."""
-    (LIST, RELEASE, RESERVE, GROUP, CAPABILITIES, SETUP, EXTEND, DUMP) = range(8)
+    (DISCONNECT, LIST, RELEASE, RESERVE, GROUP, CAPABILITIES, SETUP, EXTEND, DUMP) = range(9)
 
 
 class Columns(object):
@@ -139,7 +139,7 @@ class JenkinsNodeShell(object):
         parser = argparse.ArgumentParser(prog='devnest',
                                          parents=[config_group],
                                          description='CLI to reserve, release'
-                                         ' or manage hardware in DevNest.',
+                                         ' or manage nodes in DevNest.',
                                          formatter_class=formatter,
                                          add_help=False)
 
@@ -174,6 +174,12 @@ class JenkinsNodeShell(object):
         nest_group.add_argument('-a', '--all',
                                 action='store_true',
                                 help=argparse.SUPPRESS)
+
+        disconnect_parser = subparsers.add_parser('disconnect',
+                                            parents=[node_parser, nest_parser],
+                                            formatter_class=formatter,
+                                            help='disconnect node(s) from Jenkins master')
+        disconnect_parser.set_defaults(action=Action.DISCONNECT)
 
         list_parser = subparsers.add_parser('list',
                                             parents=[node_parser, nest_parser],
@@ -379,6 +385,17 @@ class JenkinsNodeShell(object):
         jenkins_obj = JenkinsInstance(parser_args.url, parser_args.user,
                                       parser_args.password, parser_args.conf)
 
+        # disconnect nodes from Jenkins master
+        if parser_args.action is Action.DISCONNECT:
+            group = parser_args.group
+            if parser_args.all:
+                group = None
+
+            jenkins_nodes = jenkins_obj.get_nodes(parser_args.node_regex, group)
+
+            for jenkins_node in jenkins_nodes:
+                jenkins_node = jenkins_node.disconnect()
+
         # List nodes
         if parser_args.action is Action.LIST:
             group = parser_args.group
@@ -450,10 +467,11 @@ class JenkinsNodeShell(object):
 
             if reserve_node.get_node_status() == NodeStatus.JOB_RUNNING and \
                not parser_args.force:
-                err_msg = "Node %s is currently running CI job. Use --force flag " \
-                          "to reserve the node.\n\tAfter doing so, use:\n\t" \
-                          "    $ devnest list -g %s %s\n\tTo check if " \
-                          "CI job is finished and you can use it - node "\
+                err_msg = "A CI job is is currently running on %s node. Use --force flag " \
+                          "to reserve the node.\n\tIt will be reserved and available once the currently \ " \
+                          "running CI job finishes\n\tUse:\n\t" \
+                          "    $ devnest list -g %s %s\n\tto check if " \
+                          "CI job has finished and you can use it, if so the node "\
                           "status will become reserved.\n\tThis may take even few hours!" \
                           "\n\tMore details about current node usage is available at:" \
                           "\n\t    %s" \
@@ -467,7 +485,7 @@ class JenkinsNodeShell(object):
                not parser_args.force:
                 err_msg = "Node %s is not online and can not be reserved. " \
                     % reserve_node.get_name()
-                err_msg += "Node status: %s. Try release the node." \
+                err_msg += "Node status: %s. Try releasing the node." \
                     % reserve_node.get_node_status_str()
                 raise CommandError(err_msg)
 
