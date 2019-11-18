@@ -777,7 +777,7 @@ class Node(object):
 
         LOG.info('Disconnecting %s from Jenkins master' % self.node_name)
 
-        self.jenkins.requester.post_and_confirm_status("%s/doDisconnect?offlineMessage=%s" % (node_url, msg), data={} )
+        self.jenkins.requester.post_and_confirm_status("%s/doDisconnect?offlineMessage=%s" % (node_url, msg), data={})
 
     def _update_node_with_node_details(self, node_details):
         """Update node with NodeDetails data.

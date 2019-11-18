@@ -1,6 +1,12 @@
 CHANGES
 =======
 
+* add support for 'disconnect' from Jenkins master cli command
+
+0.0.1.dev49
+-----------
+
+* Add IP address to the list column
 * Add dump config options
 * Add directory options to update multiply slaves at once
 * Ensure force reservation is only for not reserved nodes
