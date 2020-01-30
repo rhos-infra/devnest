@@ -177,6 +177,7 @@ class JenkinsInstance(object):
             baseurl = '%s/computer/%s' % (self.jenkins.baseurl, slave_name)
 
             config_str = ElementTree.tostring(slave_xml.getroot())
+            offlineMessage = 'devnest_making_slave_offline_after_setup'
 
             LOG.info('Node config: %s using file: %s' % (slave_name, s_xml_path))
 
@@ -184,12 +185,18 @@ class JenkinsInstance(object):
                 self.jenkins.requester.post_and_confirm_status("%s/config.xml"
                                                                % baseurl,
                                                                data=config_str)
+
             except JenkinsAPIException:
                 LOG.debug('Node %s not found, adding new' % slave_name)
-                self.jenkins.create_node(slave_name, labels='provisioning_node')
+                self.jenkins.create_node(slave_name, labels='devnest_creating_a_new_slave')
                 self.jenkins.requester.post_and_confirm_status("%s/config.xml"
                                                                % baseurl,
                                                                data=config_str)
+
+            finally:
+                LOG.info("Take the slave offline after it's been set up")
+                self.jenkins.requester.post_and_confirm_status("%s/toggleOffline"
+                                                               % baseurl, data={'offlineMessage': offlineMessage})
 
             LOG.info('Node %s updated' % slave_name)
 
