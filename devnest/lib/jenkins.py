@@ -186,10 +186,6 @@ class JenkinsInstance(object):
                                                                % baseurl,
                                                                data=config_str)
 
-                LOG.info("Take the slave offline after it's been set up")
-                self.jenkins.requester.post_and_confirm_status("%s/doDisconnect"
-                                                               % baseurl, data={'offlineMessage': offlineMessage})
-
             except JenkinsAPIException:
                 LOG.debug('Node %s not found, adding new' % slave_name)
                 self.jenkins.create_node(slave_name, labels='devnest_creating_a_new_slave')
@@ -197,8 +193,9 @@ class JenkinsInstance(object):
                                                                % baseurl,
                                                                data=config_str)
 
+            finally:
                 LOG.info("Take the slave offline after it's been set up")
-                self.jenkins.requester.post_and_confirm_status("%s/doDisconnect"
+                self.jenkins.requester.post_and_confirm_status("%s/toggleOffline"
                                                                % baseurl, data={'offlineMessage': offlineMessage})
 
             LOG.info('Node %s updated' % slave_name)
