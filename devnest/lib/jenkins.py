@@ -177,7 +177,8 @@ class JenkinsInstance(object):
             baseurl = '%s/computer/%s' % (self.jenkins.baseurl, slave_name)
 
             config_str = ElementTree.tostring(slave_xml.getroot())
-            offlineMessage = 'devnest_making_slave_offline_after_setup'
+            hostname = os.uname()[1]
+            offlineMessage = 'devnest_making_slave_offline_after_setup(executed from %s)' % hostname
 
             LOG.info('Node config: %s using file: %s' % (slave_name, s_xml_path))
 
