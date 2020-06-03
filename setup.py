@@ -23,14 +23,17 @@ try:
 except ImportError:
     pass
 import os
-import platform
+import distro
 
 
 setup(
     setup_requires=['pbr>=3.0.0', 'setuptools>=17.1'],
     pbr=True)
 
-if all(platform.linux_distribution(supported_dists="redhat")):
+SELINUX_DISTROS = ["fedora", "rhel", "centos" ]
+
+if distro.linux_distribution(full_distribution_name=False)[0] in SELINUX_DISTROS:
+
     # For RedHat based systems, get selinux binding
     try:
         import selinux

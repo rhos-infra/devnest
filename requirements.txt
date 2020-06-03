@@ -3,3 +3,4 @@ jenkinsapi
 terminaltables>=3.1.0
 urllib3
 requests
+distro
