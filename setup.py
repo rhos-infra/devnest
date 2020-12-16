@@ -30,7 +30,7 @@ setup(
     setup_requires=['pbr>=3.0.0', 'setuptools>=17.1'],
     pbr=True)
 
-SELINUX_DISTROS = ["fedora", "rhel", "centos" ]
+SELINUX_DISTROS = ["fedora", "rhel", "centos"]
 
 if distro.linux_distribution(full_distribution_name=False)[0] in SELINUX_DISTROS:
 
