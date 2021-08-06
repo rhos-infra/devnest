@@ -22,13 +22,13 @@ try:
     import multiprocessing  # noqa
 except ImportError:
     pass
-import os
-import distro
-
 
 setup(
-    setup_requires=['pbr>=3.0.0', 'setuptools>=17.1'],
+    setup_requires=['pbr>=3.0.0', 'setuptools>=17.1', 'distro', 'selinux'],
     pbr=True)
+
+import os
+import distro
 
 SELINUX_DISTROS = ["fedora", "rhel", "centos"]
 
