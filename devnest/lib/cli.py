@@ -316,11 +316,18 @@ class JenkinsNodeShell(object):
 
         setup_opts_group.add_argument('-d', '--dir',
                                       help='node config(s) directory')
+
+        setup_options.add_argument('-o', '--offline',
+                                   action='store',
+                                   default='True',
+                                   metavar='True|False',
+                                   help='whether to offline the node(s) after registering them in Jenkins Master')
+
         setup = subparsers.add_parser('setup',
                                       parents=[node_parser,
                                                setup_options],
                                       formatter_class=formatter,
-                                      help='setup node based on the XML')
+                                      help='setup node(s) based on an XML file or a directory of XML files')
 
         setup.set_defaults(action=Action.SETUP)
 
@@ -582,9 +589,9 @@ class JenkinsNodeShell(object):
 
         if parser_args.action is Action.SETUP:
             if parser_args.file:
-                jenkins_obj.create_update_node_from_xml(parser_args.file)
+                jenkins_obj.create_update_node_from_xml(parser_args.file, parser_args.offline)
             elif parser_args.dir:
-                jenkins_obj.create_update_node_from_xml(parser_args.dir,
+                jenkins_obj.create_update_node_from_xml(parser_args.dir, parser_args.offline,
                                                         directory=True)
 
         if parser_args.action is Action.DUMP:

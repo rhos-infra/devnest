@@ -128,7 +128,7 @@ class JenkinsInstance(object):
                               '%s' % full_filepath)
         return slave_xmls
 
-    def create_update_node_from_xml(self, xml_path, directory=False):
+    def create_update_node_from_xml(self, xml_path, offline, directory=False):
         """Create or update node based on passed path to XML file
            or directory that contains XML files
 
@@ -137,6 +137,7 @@ class JenkinsInstance(object):
 
         Args:
             xml_path (:obj:`str`): path to XML file with node details
+            offline (:obj:`bool`): whether to offline the node(s) after registering them in Jenkins Master
         """
 
         slave_xmls = []
@@ -177,27 +178,30 @@ class JenkinsInstance(object):
             baseurl = '%s/computer/%s' % (self.jenkins.baseurl, slave_name)
 
             config_str = ElementTree.tostring(slave_xml.getroot())
-            hostname = os.uname()[1]
-            offlineMessage = 'devnest_making_slave_offline_after_setup(executed from %s)' % hostname
 
             LOG.info('Node config: %s using file: %s' % (slave_name, s_xml_path))
-
             try:
-                self.jenkins.requester.post_and_confirm_status("%s/config.xml"
-                                                               % baseurl,
-                                                               data=config_str)
+                LOG.info('Trying to apply new config to an existing node (if exists): %s' % slave_name)
+                self.jenkins.requester.post_xml_and_confirm_status("%s/config.xml"
+                                                                   % baseurl,
+                                                                   data=config_str)
 
-            except JenkinsAPIException:
-                LOG.debug('Node %s not found, adding new' % slave_name)
-                self.jenkins.create_node(slave_name, labels='devnest_creating_a_new_slave')
-                self.jenkins.requester.post_and_confirm_status("%s/config.xml"
-                                                               % baseurl,
-                                                               data=config_str)
+            except JenkinsAPIException as e:
+                LOG.debug('Exception caught during previous step: %s' % e)
+                LOG.info('Creating a new node: %s' % slave_name)
+                label = '"devnest_creating_a_new_slave (executed from host: %s)"' % os.uname()[1]
+                self.jenkins.create_node(slave_name, labels=label)
+                self.jenkins.requester.post_xml_and_confirm_status("%s/config.xml"
+                                                                   % baseurl,
+                                                                   data=config_str)
 
             finally:
-                LOG.info("Take the slave offline after it's been set up")
-                self.jenkins.requester.post_and_confirm_status("%s/toggleOffline"
-                                                               % baseurl, data={'offlineMessage': offlineMessage})
+                if eval(offline):
+                    LOG.info("Take the slave offline after it's been registered with Jenkins Master")
+                    hostname = os.uname()[1]
+                    offline_message = 'devnest_making_slave_offline_after_setup (executed from host: %s)' % hostname
+                    self.jenkins.requester.post_and_confirm_status("%s/toggleOffline"
+                                                                   % baseurl, data={'offlineMessage': offline_message})
 
             LOG.info('Node %s updated' % slave_name)
 
