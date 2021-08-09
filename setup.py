@@ -27,8 +27,8 @@ setup(
     setup_requires=['pbr>=3.0.0', 'setuptools>=17.1', 'distro', 'selinux'],
     pbr=True)
 
-import os
-import distro
+import os  # noqa: E402
+import distro  # noqa: E402
 
 SELINUX_DISTROS = ["fedora", "rhel", "centos"]
 
