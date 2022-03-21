@@ -670,7 +670,7 @@ class Node(object):
                                                        owner,
                                                        reprovision_pending)
 
-            except (TypeError, ValueError):
+            except (AttributeError, TypeError, ValueError):
                 LOG.debug('Could not read reservation data for node %s,'
                           ' invalid json format: %s' % (self.get_name(),
                                                         offline_cause_reason))
