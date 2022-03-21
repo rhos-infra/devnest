@@ -675,6 +675,10 @@ class Node(object):
                           ' invalid json format: %s' % (self.get_name(),
                                                         offline_cause_reason))
 
+            except Exception:
+                LOG.error('Caught exception for node %s' % self.get_name())
+                raise
+
         return reservation_info
 
     def _get_total_physical_mem(self):
