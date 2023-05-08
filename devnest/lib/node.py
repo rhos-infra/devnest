@@ -658,17 +658,23 @@ class Node(object):
         if offline_cause_reason:
             try:
                 json_data = json.loads(offline_cause_reason)
-                res_data = json_data.get('reservation')
-                if res_data:
-                    owner = str(res_data.get('owner'))
-                    start_time = float(res_data.get('startTime'))
-                    end_time = float(res_data.get('endTime'))
-                    reprovision_pending = bool(res_data.get(
-                                               'reprovisionPending'))
+                # Usually the offline_cause is a dictionary but sometimes
+                # it is a simple string like for example '17.1', which
+                # json_loads parses fine but the rest of the code breaks
+                # when trying to get keys. We check therefore that we are
+                # dealing with a dict.
+                if type(json_data) is dict:
+                    res_data = json_data.get('reservation')
+                    if res_data:
+                        owner = str(res_data.get('owner'))
+                        start_time = float(res_data.get('startTime'))
+                        end_time = float(res_data.get('endTime'))
+                        reprovision_pending = bool(res_data.get(
+                                                   'reprovisionPending'))
 
-                    reservation_info = NodeReservation(start_time, end_time,
-                                                       owner,
-                                                       reprovision_pending)
+                        reservation_info = NodeReservation(start_time, end_time,
+                                                           owner,
+                                                           reprovision_pending)
 
             except (AttributeError, TypeError, ValueError):
                 LOG.debug('Could not read reservation data for node %s,'
