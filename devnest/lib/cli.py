@@ -135,6 +135,13 @@ class JenkinsNodeShell(object):
                                        'in the configuration file. '
                                        '[DEVNEST_PASSWORD]')
 
+        config_group.add_argument('-T', '--timeout',
+                                  default=os.environ.get('DEVNEST_TIMEOUT',
+                                                         30),
+                                  help='Timeout for Jenkins operations. This '
+                                       'overrides the timeout specified in the '
+                                       'configuration file. [DEVENEST_TIMEOUT]')
+
         # Main parser
         parser = argparse.ArgumentParser(prog='devnest',
                                          parents=[config_group],
@@ -390,7 +397,8 @@ class JenkinsNodeShell(object):
         LOG.debug("%s" % parser_args)
 
         jenkins_obj = JenkinsInstance(parser_args.url, parser_args.user,
-                                      parser_args.password, parser_args.conf)
+                                      parser_args.password, parser_args.conf,
+                                      timeout=parser_args.timeout)
 
         # disconnect nodes from Jenkins master
         if parser_args.action is Action.DISCONNECT:
