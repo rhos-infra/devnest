@@ -137,7 +137,7 @@ class JenkinsNodeShell(object):
 
         # Main parser
         parser = argparse.ArgumentParser(prog='devnest',
-                                         parents=[config_group],
+                                         parents=[config_parser],
                                          description='CLI to reserve, release'
                                          ' or manage nodes in DevNest.',
                                          formatter_class=formatter,
