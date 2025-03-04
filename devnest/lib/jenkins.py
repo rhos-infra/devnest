@@ -46,7 +46,7 @@ class JenkinsInstance(object):
         config_file (:obj:`str`): path to config file
     """
     def __init__(self, jenkins_url=None, username=None, password=None,
-                 config_file=None):
+                 config_file=None, timeout=None):
 
         self.jenkins_nodes = []
 
@@ -56,12 +56,13 @@ class JenkinsInstance(object):
 
         # Read config once if one of the args is missing
         if not (jenkins_url and username and password):
-            config_url, config_username, config_password = \
+            config_url, config_username, config_password, config_timeout = \
                 self._get_credentials_from_config(config_file)
 
         self.jenkins_url = config_url if not jenkins_url else jenkins_url
         self.jenkins_username = config_username if not username else username
         self.jenkins_password = config_password if not password else password
+        self.jenkins_timeout = timeout or config_timeout
 
         LOG.info('Using Jenkins URL: %s' % self.jenkins_url)
         LOG.debug('Using username: %s' % self.jenkins_username)
@@ -251,7 +252,11 @@ class JenkinsInstance(object):
             url = config.get("jenkins", "url")
             username = config.get("jenkins", "user")
             password = config.get("jenkins", "password")
-            return url, username, password
+            try:
+                timeout = config.get("jenkins", "timeout")
+            except ConfigParser.NoOptionError:
+                timeout = 30
+            return url, username, password, timeout
 
         raise exceptions.ConfigParser("Failed to get username, "
                                       "password or url from config "
