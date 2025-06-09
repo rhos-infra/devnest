@@ -23,6 +23,7 @@ from devnest.lib import logger
 from six.moves.urllib.parse import quote as urlquote
 from xml.etree import ElementTree
 
+import html
 import json
 import re
 import socket
@@ -657,7 +658,7 @@ class Node(object):
 
         if offline_cause_reason:
             try:
-                json_data = json.loads(offline_cause_reason)
+                json_data = json.loads(html.unescape(offline_cause_reason))
                 res_data = json_data.get('reservation')
                 if res_data:
                     owner = str(res_data.get('owner'))
