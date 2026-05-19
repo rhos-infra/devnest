@@ -658,7 +658,12 @@ class Node(object):
 
         if offline_cause_reason:
             try:
-                json_data = json.loads(html.unescape(offline_cause_reason))
+                unescaped = html.unescape(html.unescape(
+                    offline_cause_reason))
+                json_start = unescaped.find('{')
+                if json_start == -1:
+                    raise ValueError("No JSON object found")
+                json_data = json.loads(unescaped[json_start:])
                 res_data = json_data.get('reservation')
                 if res_data:
                     owner = str(res_data.get('owner'))
