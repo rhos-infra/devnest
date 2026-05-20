@@ -27,6 +27,7 @@ import os
 from devnest.lib import exceptions
 from devnest.lib import logger
 from devnest.lib.node import Node
+from devnest.lib.node import NodeData
 from jenkinsapi.jenkins import Jenkins
 from jenkinsapi.utils.crumb_requester import CrumbRequester
 from jenkinsapi.custom_exceptions import JenkinsAPIException
@@ -70,6 +71,15 @@ class JenkinsInstance(object):
 
         self.jenkins = self._get_jenkins_instance()
 
+    def _get_nodes_data(self):
+        nodes_data = dict()
+        nodes = self.jenkins.nodes._poll(
+            tree="computer[displayName,description,offlineCauseReason,idle,offline,temporarilyOffline,monitorData[_class,totalPhysicalMemory]]"
+        )
+        for node in nodes.get('computer'):
+            nodes_data[node.get(NodeData.DISPLAY_NAME)] = node
+        return nodes_data
+
     def get_nodes(self, node_regex=None, group=None):
         """Return list of all nodes or subset based on regex.
 
@@ -89,10 +99,10 @@ class JenkinsInstance(object):
         else:
             filtered_nodes = nodes.keys()
 
-        nodes_data = nodes._data['computer']
+        nodes_data = self._get_nodes_data()
 
         for node in filtered_nodes:
-            cur_node = Node(self.jenkins, node, nodes_data)
+            cur_node = Node(self.jenkins, node, nodes_data.get(node))
             if group is None:
                 self.jenkins_nodes.append(cur_node)
             else:
