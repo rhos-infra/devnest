@@ -273,17 +273,12 @@ class Node(object):
         node_name (:obj:`str`): Node name
         jenkins_instance(:obj:`Jenkins.nodes._data['computer']`): Node
     """
-    def __init__(self, jenkins_instance, node_name, nodes_data):
+    def __init__(self, jenkins_instance, node_name, node_data):
         self.node_name = node_name
-        self.node_data = None
+        self.node_data = node_data
 
         self.jenkins = jenkins_instance
         self.node = None
-
-        for node_dt in nodes_data:
-            if node_dt.get(NodeData.DISPLAY_NAME) == node_name:
-                self.node_data = node_dt
-                break
 
         if not self.node_data:
             raise NodeDataError("Failed to get data for node %s" % node_name)
@@ -645,6 +640,13 @@ class Node(object):
             return self.reservation_info.get_reservation_endtime_epoch()
         return None
 
+    def _get_offline_cause_reason_json(self, offline_cause_reason):
+        # Jenkins API returns double-escaped HTML entities,
+        # so we need to unescape twice to get the correct JSON.
+        reason = html.unescape(
+            html.unescape(offline_cause_reason)).strip()
+        return json.loads(reason)
+
     def _get_reservation_info(self):
         """Return object with metadata about reservation.
 
@@ -658,7 +660,8 @@ class Node(object):
 
         if offline_cause_reason:
             try:
-                json_data = json.loads(html.unescape(offline_cause_reason))
+                json_data = self._get_offline_cause_reason_json(offline_cause_reason)
+
                 res_data = json_data.get('reservation')
                 if res_data:
                     owner = str(res_data.get('owner'))
@@ -700,7 +703,7 @@ class Node(object):
         except Exception:
             pass
 
-        if memory_size == 0:
+        if not memory_size or memory_size == 0:
             return ""
 
         for value in ['bytes', 'KB', 'MB', 'GB']:
